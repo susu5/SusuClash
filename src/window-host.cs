@@ -65,6 +65,34 @@ internal sealed class SusuWindow : Form
     {
         base.OnHandleCreated(e);
         try { int noCorners = 1; DwmSetWindowAttribute(Handle, 33, ref noCorners, sizeof(int)); } catch { }
+        // Windows 11 can add its own light-colored border to a custom frame.
+        // The resizing hit area below remains part of our client area.
+        try { int noBorder = unchecked((int)0xfffffffe); DwmSetWindowAttribute(Handle, 34, ref noBorder, sizeof(int)); } catch { }
+    }
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        base.OnPaintBackground(e);
+        // Paint the resize gutter explicitly: it must blend into the active
+        // theme rather than exposing the default light native window surface.
+        using (var brush = new SolidBrush(BackColor)) {
+            int left = browser.Left, top = browser.Top;
+            int right = browser.Right, bottom = browser.Bottom;
+            e.Graphics.FillRectangle(brush, 0, 0, ClientSize.Width, Math.Max(0, top));
+            e.Graphics.FillRectangle(brush, 0, bottom, ClientSize.Width, Math.Max(0, ClientSize.Height - bottom));
+            e.Graphics.FillRectangle(brush, 0, top, Math.Max(0, left), Math.Max(0, bottom - top));
+            e.Graphics.FillRectangle(brush, right, top, Math.Max(0, ClientSize.Width - right), Math.Max(0, bottom - top));
+        }
+    }
+    private void ApplyThemeColor(string color)
+    {
+        BackColor = ColorTranslator.FromHtml(color);
+        Invalidate();
+    }
+    private int ResizeHitAt(int x, int y)
+    {
+        var p = PointToScreen(new Point(x, y));
+        int coordinates = unchecked((p.Y << 16) | (p.X & 0xffff));
+        return (int)SendMessage(Handle, WM_NCHITTEST, IntPtr.Zero, (IntPtr)coordinates);
     }
     protected override void WndProc(ref Message m)
     {
@@ -183,9 +211,9 @@ internal sealed class SusuWindow : Form
                     case "window:close": Close(); break;
                     case "window:drag": HandleTitleDown(); break;
                     case "window:restore-drag": RestoreAndDrag(); break;
-                    case "theme:cat": BackColor = ColorTranslator.FromHtml("#f3eaf0"); break;
-                    case "theme:fish": BackColor = ColorTranslator.FromHtml("#dcf0e5"); break;
-                    case "theme:whale": BackColor = ColorTranslator.FromHtml("#192641"); break;
+                    case "theme:cat": ApplyThemeColor("#f3eaf0"); break;
+                    case "theme:fish": ApplyThemeColor("#dcf0e5"); break;
+                    case "theme:whale": ApplyThemeColor("#192641"); break;
                 }
             };
             core.NavigationCompleted += async delegate(object sender, CoreWebView2NavigationCompletedEventArgs e) {
@@ -198,9 +226,17 @@ internal sealed class SusuWindow : Form
                         if (!GetWindowRect(Handle, out win) || !GetClientRect(Handle, out client) || !ClientToScreen(Handle, ref origin)) throw new Exception();
                         File.WriteAllText(Path.Combine(profile, "window-metrics.txt"), String.Join(",", new[] {win.Left,win.Top,win.Right,win.Bottom,origin.X,origin.Y,client.Right,client.Bottom}));
                         if (!AllowedExternal("https://susu5.cn/") || !AllowedExternal("https://github.com/susu5") || !AllowedExternal("https://github.com/susu5/SusuClash/releases") || AllowedExternal("https://github.com/susu5/SusuClash/releases/evil") || AllowedExternal("https://github.com/susu5/SusuClash/releases?token=x") || AllowedExternal("https://susu5.cn.example.test/") || AllowedExternal("http://susu5.cn/") || AllowedExternal("https://github.com/another")) throw new Exception();
-                        await core.ExecuteScriptAsync("window.chrome.webview.postMessage('theme:whale')");
-                        await Task.Delay(200);
-                        if (BackColor != ColorTranslator.FromHtml("#192641")) throw new Exception();
+                        string[,] themes = { {"cat", "#f3eaf0"}, {"fish", "#dcf0e5"}, {"whale", "#192641"} };
+                        for (int i = 0; i < themes.GetLength(0); i++) {
+                            await core.ExecuteScriptAsync("window.chrome.webview.postMessage('theme:" + themes[i, 0] + "')");
+                            await Task.Delay(150);
+                            if (BackColor != ColorTranslator.FromHtml(themes[i, 1])) throw new Exception();
+                        }
+                        int w = ClientSize.Width, h = ClientSize.Height;
+                        if (ResizeHitAt(1, h / 2) != HTLEFT || ResizeHitAt(w - 2, h / 2) != HTRIGHT ||
+                            ResizeHitAt(w / 2, 1) != HTTOP || ResizeHitAt(w / 2, h - 2) != HTBOTTOM ||
+                            ResizeHitAt(1, 1) != HTTOPLEFT || ResizeHitAt(w - 2, 1) != HTTOPRIGHT ||
+                            ResizeHitAt(1, h - 2) != HTBOTTOMLEFT || ResizeHitAt(w - 2, h - 2) != HTBOTTOMRIGHT) throw new Exception();
                         await core.ExecuteScriptAsync("window.chrome.webview.postMessage('window:maximize')");
                         await Task.Delay(250);
                         if (WindowState != FormWindowState.Maximized) throw new Exception();

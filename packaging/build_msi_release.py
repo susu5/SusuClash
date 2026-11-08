@@ -36,7 +36,7 @@ def digest(path):
     return h.hexdigest()
 
 def main():
-    parser=argparse.ArgumentParser(description='Build SusuClash 0.1.8 from reviewed upstream dependencies')
+    parser=argparse.ArgumentParser(description='Build SusuClash 0.1.9 from reviewed upstream dependencies')
     parser.add_argument('--deps',required=True,help='directory containing the verified upstream files')
     parser.add_argument('--output',required=True,help='new .msi output path; existing files will not be overwritten')
     parser.add_argument('--work-dir',required=True,help='directory for temporary compiled inputs and WiX source')
@@ -45,7 +45,7 @@ def main():
     if not deps.is_dir():raise SystemExit('Dependency directory not found')
     working.mkdir(parents=True,exist_ok=True);output.parent.mkdir(parents=True,exist_ok=True)
     data=json.loads((SOURCE/'package.json').read_text(encoding='utf8'))
-    if data.get('version')!='0.1.8' or data.get('license')!='GPL-3.0-only':
+    if data.get('version')!='0.1.9' or data.get('license')!='GPL-3.0-only':
         raise SystemExit('Unexpected release version or license')
     if output.exists(): raise SystemExit('Refusing to overwrite an existing public release MSI')
     manifest=json.loads((SOURCE/'packaging'/'release-dependencies-v0.1.8.json').read_text(encoding='utf8'))
@@ -143,7 +143,7 @@ def main():
     rtf=work/'gpl.rtf';rtf.write_text(r'{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}\f0\fs18 '+escape_rtf((SOURCE/'LICENSE').read_text(encoding='utf8'))+'}',encoding='ascii')
 
     wix=ET.Element('{%s}Wix'%NS)
-    package=el(wix,'Package',Name='SusuClash',Manufacturer='SusuClash',Version='0.1.8',UpgradeCode='{D7806B3D-6DD7-4DA6-B640-D96A07185A75}',Scope='perUser')
+    package=el(wix,'Package',Name='SusuClash',Manufacturer='SusuClash',Version='0.1.9',UpgradeCode='{D7806B3D-6DD7-4DA6-B640-D96A07185A75}',Scope='perUser')
     ET.SubElement(package,'{%s}WixUI'%UI_NS,{'Id':'WixUI_Minimal'})
     el(package,'WixVariable',Id='WixUILicenseRtf',Value=str(rtf))
     el(package,'MajorUpgrade',Schedule='afterInstallInitialize',DowngradeErrorMessage='A newer version of SusuClash is already installed.')
@@ -173,7 +173,7 @@ def main():
     components.append('StartMenuShortcut')
     feature=el(package,'Feature',Id='MainFeature',Title='SusuClash',Level='1')
     for cid in components:el(feature,'ComponentRef',Id=cid)
-    wxs=work/'SusuClash-0.1.8.wxs';ET.ElementTree(wix).write(wxs,encoding='utf-8',xml_declaration=True)
+    wxs=work/'SusuClash-0.1.9.wxs';ET.ElementTree(wix).write(wxs,encoding='utf-8',xml_declaration=True)
     subprocess.run(['wix','build','-ext','WixToolset.UI.wixext','-culture','zh-CN','-arch','x64','-dcl','medium','-pdbtype','none',str(wxs),'-out',str(output)],check=True,cwd=str(SOURCE))
     print('MSI',output);print('SHA256',digest(output));print('Files',len(files));print('Build directory',work)
 
