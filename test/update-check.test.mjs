@@ -66,7 +66,7 @@ test('server uses only its own enabled proxy and ignores externally managed prox
   const profileStore={list:async()=>({activeId:null,profiles:[]}),restoreActive:async()=>{}};
   const monitor={status:()=>({preferences:{backups:{}}}),stop(){},invalidate(){}};
   const updateRequest=async({proxyPort})=>{seen.push(proxyPort);return {status:404,body:''}};
-  const app=await startServer({core,systemProxy,profileStore,monitor,updateRequest});t.after(app.close);
+  const app=await startServer({core,systemProxy,profileStore,monitor,updateRequest,dailyUpdate:false});t.after(app.close);
   for(const config of [{enabled:true,managed:true,running:true,port:7890},{enabled:true,managed:false,running:true,port:7890},{enabled:false,managed:true,running:true,port:7890},{enabled:true,managed:true,running:false,port:7890},{enabled:true,managed:true,running:true,port:0}]){
     ({enabled,managed,running,port}=config);
     assert.equal((await (await fetch(app.url+'api/update-check')).json()).status,'unreleased');

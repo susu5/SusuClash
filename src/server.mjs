@@ -16,6 +16,7 @@ import { createCodexHealth, codexTarget } from './codex-health.mjs';
 import { createCodexRepair } from './codex-repair.mjs';
 import { createThemePreferences } from './theme-preferences.mjs';
 import { createUpdateChecker } from './update-check.mjs';
+import { createDailyUpdate } from './daily-update.mjs';
 
 const appVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version;
 
@@ -126,7 +127,7 @@ async function httpProviders(core) {
   return Object.entries(response?.providers ?? {}).filter(([, data]) => data?.vehicleType === 'HTTP').map(([name]) => name);
 }
 
-export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, codexRepairService, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, automationIntervalMs = 5000 } = {}) {
+export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, codexRepairService, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, dailyUpdate, automationIntervalMs = 5000 } = {}) {
   const managed = typeof core.applyConfig === 'function';
   const codexRepair = codexRepairService || createCodexRepair({core});
   const profiles = profileStore || (managed ? createProfileStore({ directory: path.join(core.directory, 'profiles'), validateConfig: core.validateConfig, applyConfig: core.applyConfig }) : null);
@@ -173,6 +174,11 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       catch { recoveryWarning = '无法恢复上次配置，请检查内核和配置。'; }
     })().finally(() => { restoring = null; });
   }
+
+  const daily = dailyUpdate === false ? null : dailyUpdate || (managed ? createDailyUpdate({
+    directory:core.directory, checker:updates, currentVersion:appVersion,
+    waitUntilReady:async()=>{if(restoring) await restoring;}
+  }) : null);
 
   let automation = monitor || null;
   let monitorGroup = '';
@@ -324,7 +330,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   }
 
   const reads = {
-    'update-check': async () => updates.check(),
+    'update-check': async () => daily ? daily.checkNow() : updates.check(),
+    'update-settings': async () => daily ? daily.get() : {enabled:false,lastCheckedAt:null,nextCheckAt:null,lastResult:null,checking:false,error:'自动检查不可用。'},
     theme: async () => theme ? theme.get() : {theme:'cat'},
     state,
     logs: async () => ({entries:logEntries}),
@@ -360,6 +367,10 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     }
   };
   const writes = {
+    'update-settings': input => mutation(async()=>{
+      if(!daily || typeof input.enabled!=='boolean') throw new AppError('自动检查设置不可用。',400);
+      return daily.set({enabled:input.enabled});
+    },false),
     theme: input => mutation(async () => {
       if (!theme || !['cat','fish','whale'].includes(input?.theme)) throw new AppError('主题设置不可用。', 400);
       return theme.set({theme:input.theme});
@@ -517,12 +528,14 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       resolve();
     });
   });
+  daily?.start();
   return {
     url: origin + prefix,
     origin,
     close: () => {
       if (closePromise) return closePromise;
       closing = true;
+      daily?.stop();
       closePromise = (async () => {
         if (automation?.stop) await automation.stop();
         await writeTail;

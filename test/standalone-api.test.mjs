@@ -25,7 +25,7 @@ test('standalone API imports and applies a local configuration with own core', a
   const autostart = { getStatus:async()=>({enabled:startupEnabled,conflict:false}), enable:async()=>({enabled:startupEnabled=true,conflict:false}), disable:async()=>({enabled:startupEnabled=false,conflict:false}) };
   const trayPreferences = createTrayPreferences({directory:dir});
   trayPreferences.setAvailability(true);
-  let app = await startServer({ core, systemProxy, healthProbe, codexHealth, autostart, trayPreferences, automationIntervalMs:30 });
+  let app = await startServer({ core, systemProxy, healthProbe, codexHealth, autostart, trayPreferences, dailyUpdate:false, automationIntervalMs:30 });
   t.after(async () => { if (app) await app.close(); await rm(dir, { recursive: true, force: true }); });
   const get = async url => { const r = await fetch(app.url + 'api/' + url); assert.equal(r.status,200); return r.json(); };
   const post = async (url, value) => { const r = await fetch(app.url + 'api/' + url, {method:'POST',headers:{'Content-Type':'application/json',Origin:app.origin},body:JSON.stringify(value)}); const data = await r.json(); assert.equal(r.status,200,JSON.stringify(data)); return data; };
@@ -80,7 +80,7 @@ test('standalone API imports and applies a local configuration with own core', a
   assert(logs.entries.some(item=>item.message==='配置已启用'));
   assert(!JSON.stringify(logs).includes('isolated'));
   await app.close(); app = null;
-  app = await startServer({core:createManagedCore({directory:dir}),systemProxy,healthProbe,codexHealth,autostart,automationIntervalMs:30});
+  app = await startServer({core:createManagedCore({directory:dir}),systemProxy,healthProbe,codexHealth,autostart,dailyUpdate:false,automationIntervalMs:30});
   for (let i=0; i<100 && (await get('runtime')).restoring; i++) await new Promise(resolve=>setTimeout(resolve,50));
   assert.equal((await get('state')).port,nextPort);
   const restored = await get('automation');
@@ -96,7 +96,7 @@ test('failed crash recovery is visible and blocks silent configuration restore',
   const systemProxy = {restoreOnExit:async()=>{if(recoveryFails)throw Error('fixture');}, getStatus:async()=>({enabled:false,managed:false})};
   const profileStore = {restoreActive:async()=>{configRestored=true;},list:async()=>({activeId:null,profiles:[]})};
   const monitor = {stop(){},invalidate(){},status:()=>({preferences:{backups:{}}})};
-  const app = await startServer({core,systemProxy,profileStore,monitor});
+  const app = await startServer({core,systemProxy,profileStore,monitor,dailyUpdate:false});
   t.after(async()=>{recoveryFails=false; await app.close(); await rm(dir,{recursive:true,force:true});});
   const response = await fetch(app.url+'api/runtime');
   const status = await response.json();
@@ -114,7 +114,7 @@ test('shutdown waits for in-flight writes and rejects new mutations', async t =>
   const proxy = {restoreOnExit:async()=>events.push('restore'),getStatus:async()=>({enabled:false})};
   const profileStore = {restoreActive:async()=>{},list:async()=>({activeId:null,profiles:[]}),activate:async()=>{entered();await gate;events.push('activate-done');return {id:'fixture'};}};
   const monitor={stop(){events.push('monitor-stop');},invalidate(){},status:()=>({preferences:{backups:{}}})};
-  const app=await startServer({core,profileStore,systemProxy:proxy,monitor});
+  const app=await startServer({core,profileStore,systemProxy:proxy,monitor,dailyUpdate:false});
   t.after(async()=>{await rm(dir,{recursive:true,force:true});});
   await new Promise(resolve=>setTimeout(resolve,20));
   events.length=0;

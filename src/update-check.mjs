@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-// A manual check only. The release page is fixed rather than trusting links in
+// The release page is fixed rather than trusting links in
 // remote metadata, and no installer is fetched or executed by the client.
 export const RELEASE_PAGE = 'https://github.com/susu5/SusuClash/releases';
 const API_URL = 'https://api.github.com/repos/susu5/SusuClash/releases/latest';
@@ -49,13 +49,17 @@ async function githubRequest({proxyPort, signal, timeoutMs}) {
 
 export function createUpdateChecker({currentVersion, request = githubRequest, getManagedProxy = async()=>null, timeoutMs=10000}={}) {
   const installed = parseVersion(currentVersion);
-  let pending = null;
+  let pending = null, activeController = null;
   const result = (status, latestVersion=null) => ({status,currentVersion:installed ? installed.join('.') : null,latestVersion,releaseUrl:RELEASE_PAGE,downloadUrl:null});
   async function run() {
     if (!installed) return result('service_error');
-    const controller = new AbortController();
-    let timer;
-    const deadline = new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('timeout');error.code='UPDATE_TIMEOUT';reject(error)},timeoutMs)});
+    const controller = new AbortController();activeController=controller;
+    let timer, onAbort;
+    const deadline = new Promise((_,reject)=>{
+      onAbort=()=>{const error=new Error('timeout');error.code='UPDATE_TIMEOUT';reject(error)};
+      controller.signal.addEventListener('abort',onAbort,{once:true});
+      timer=setTimeout(()=>controller.abort(),timeoutMs);
+    });
     try {
       const response = await Promise.race([(async()=>{
         let proxyPort=null;
@@ -76,11 +80,11 @@ export function createUpdateChecker({currentVersion, request = githubRequest, ge
       return result(compare(latest,installed)>0?'available':'up_to_date',latest.join('.'));
     } catch(error) {
       return result(error?.code==='UPDATE_TIMEOUT' || controller.signal.aborted ? 'timeout':'network_error');
-    } finally {clearTimeout(timer)}
+    } finally {clearTimeout(timer);controller.signal.removeEventListener('abort',onAbort);if(activeController===controller)activeController=null}
   }
   function check(){
     if (!pending) pending=run().finally(()=>{pending=null});
     return pending;
   }
-  return {check};
+  return {check,cancel:()=>activeController?.abort()};
 }
