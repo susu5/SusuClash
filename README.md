@@ -51,11 +51,13 @@ SusuClash 提供珍珠猫猫、薄荷游鱼和夜航鲸鱼三套主题，搭配�
 - Microsoft Edge WebView2 Runtime
 - Mihomo 内核及运行所需的规则文件
 
-项目仍在测试，运行依赖不包含在仓库中。请先阅读 [构建说明](BUILDING.md)，按需自行准备对应组件；当前仓库不提供已发布的安装包。
+项目仍在测试。Windows 安装包可在 [GitHub Releases](https://github.com/susu5/SusuClash/releases) 下载；源码构建所需的运行依赖不包含在仓库中，请参阅 [构建说明](BUILDING.md)。
+
+本版改用官方 V2Fly 地理规则数据与 DB-IP Lite 数据库。常见 GEOIP、GEOSITE 和 IP-ASN 规则已通过测试，但 V2Fly 规则不一定包含 Mihomo Meta 专用的全部分类；引用缺失分类的订阅可能需要兼容的规则数据。来源和许可详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 当前限制
 
-- TUN 模式尚未接入；订阅和应用的自动更新功能尚未实现。
+- TUN 模式尚未接入；订阅自动更新及应用自动下载、安装尚未实现。
 - 当前支持经过 Mihomo 校验的完整 YAML 配置，不支持包含远程 `proxy-providers` 或 `rule-providers` 的配置；其他格式及协议不能保证兼容。
 - 自动检测和修复无法覆盖所有故障。遇到连接问题时，仍需结合具体应用和网络环境进行检查。
 - 当前项目为测试版，不建议未经验证就将其作为现有稳定代理客户端的无缝替代品。
@@ -77,3 +79,5 @@ SusuClash 提供珍珠猫猫、薄荷游鱼和夜航鲸鱼三套主题，搭配�
 ## 许可证
 
 本项目代码采用 [GNU General Public License v3.0](LICENSE)（GPL-3.0-only）。第三方组件及其数据遵循各自的许可条款；运行依赖不包含在本仓库中，准备方式见 [构建说明](BUILDING.md)。
+
+安装包中的第三方组件、数据来源和许可证请参阅[第三方组件与数据声明](THIRD_PARTY_NOTICES.md)。

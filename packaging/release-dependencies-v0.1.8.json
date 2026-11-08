@@ -1,0 +1,114 @@
+{
+  "artifacts": {
+    "node-v24.22.1-win-x64.zip": {
+      "sha256": "d2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5",
+      "source": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip",
+      "verification": "nodejs.org SHASUMS256.txt"
+    },
+    "node-official.exe": {
+      "sha256": "d702daa815eabbff763c7d3808e235cf031cf2ca70211b56847bc72f51e240e5",
+      "source": "https://nodejs.org/dist/v24.22.1/win-x64/node.exe",
+      "verification": "nodejs.org SHASUMS256.txt; extracted from verified official ZIP"
+    },
+    "NODE-LICENSE": {
+      "sha256": "ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9",
+      "source": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip",
+      "verification": "extracted from verified official ZIP"
+    },
+    "mihomo-windows-amd64-compatible-v1.19.33.zip": {
+      "sha256": "7aaf636a4f2172dcd8ec34ac4f52797b059195e5afd6409508c963e545f8864d",
+      "source": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-windows-amd64-compatible-v1.19.33.zip",
+      "verification": "GitHub official release asset digest"
+    },
+    "mihomo-official.exe": {
+      "sha256": "926bfea2ce48a247d6a7ce4cf641980e416202d5e40fe4ee5c949089ace0e197",
+      "source": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-windows-amd64-compatible-v1.19.33.zip",
+      "verification": "extracted from verified official release ZIP"
+    },
+    "MIHOMO-LICENSE": {
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "source": "https://raw.githubusercontent.com/MetaCubeX/mihomo/v1.19.33/LICENSE",
+      "verification": "GPL-3.0 license from official source tag"
+    },
+    "mihomo-v1.19.33-source.tar.gz": {
+      "sha256": "e7c596b37ff27ec487d19b1920f73e0c97a78067ea35766530ee9659ade72711",
+      "source": "https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.33.tar.gz",
+      "verification": "official source tag commit 3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8"
+    },
+    "geoip.dat": {
+      "sha256": "eedb24b3b9fcba27e06b92c0428dab90d9496083091ae4cf39e11387fd99d0e2",
+      "source": "https://github.com/v2fly/geoip/releases/download/202611080027/geoip.dat",
+      "verification": "official GitHub release asset digest; V2Fly config uses DB-IP Lite"
+    },
+    "geosite.dat": {
+      "sha256": "dc4192dd1b644a38276ed06136d26e729fa674d25785adb38c87e040e92376b2",
+      "source": "https://github.com/v2fly/domain-list-community/releases/download/20261108011013/dlc.dat",
+      "verification": "official GitHub release asset digest; renamed dlc.dat to geosite.dat"
+    },
+    "dbip-country-lite-2026-11.mmdb": {
+      "sha256": "145ce5dfb812d8de28547e6289bb5c5f8b3df2f1dea21d324d5b575e0431311f",
+      "source": "https://download.db-ip.com/free/dbip-country-lite-2026-11.mmdb.gz",
+      "verification": "decompressed SHA1 09eea8433fe3eed71984fd6aac9d8ab3d9ca51f0 and MD5 5974b336a7409ec854f67eacd52c2061 match db-ip.com"
+    },
+    "dbip-asn-lite-2026-11.mmdb": {
+      "sha256": "81565a450281c949fc83745f5ec9cfea70b035163b1152b055645884765d153d",
+      "source": "https://download.db-ip.com/free/dbip-asn-lite-2026-11.mmdb.gz",
+      "verification": "decompressed SHA1 b8f3693d20560dcd0ccee556833ad2d362dec951 and MD5 292c9c1123635127fff445342ddfa3a8 match db-ip.com"
+    },
+    "yaml-2.8.1.tgz": {
+      "sha256": "195759b97d3f2e6085474549c069397ad7af6160be6d7c87442b8c47cb724063",
+      "source": "https://registry.npmjs.org/yaml/-/yaml-2.8.1.tgz",
+      "verification": "SHA512 integrity matches pnpm-lock.yaml"
+    },
+    "microsoft.web.webview2.1.0.4078.44.nupkg": {
+      "sha256": "dc4d1d9168df26b830398303e50210b6e1729f6ce5a7ac69d2c766852f489962",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "downloaded from NuGet over HTTPS; SDK files match previously verified version"
+    },
+    "Microsoft.Web.WebView2.Core.dll": {
+      "sha256": "24b1a6be3a7956e00d0509d4eaebf08e418fc219e964b6c269d2e04439333685",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "extracted from official NuGet package lib/net462"
+    },
+    "Microsoft.Web.WebView2.WinForms.dll": {
+      "sha256": "c6221acfe974e74d2bcc629116301c8cfba9c2041ad5d81187b0036a0b45e278",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "extracted from official NuGet package lib/net462"
+    },
+    "WebView2Loader.dll": {
+      "sha256": "239a9d6614a6cfade62b47cdb0be36e3069eedc438c3e0647a9e7b7c84ef6ea0",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "extracted from official NuGet package runtimes/win-x64/native"
+    },
+    "WEBVIEW2-LICENSE.txt": {
+      "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "extracted from official NuGet package"
+    },
+    "WEBVIEW2-NOTICE.txt": {
+      "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg",
+      "verification": "extracted from official NuGet package"
+    },
+    "V2FLY-GEOIP-LICENSE": {
+      "sha256": "5e436ff8ffbb77d8607220e9bce20c8915d860010feeb6c1ebef5a85688e9b39",
+      "source": "https://raw.githubusercontent.com/v2fly/geoip/master/LICENSE",
+      "verification": "CC BY-SA 4.0 upstream license"
+    },
+    "V2FLY-GEOSITE-LICENSE": {
+      "sha256": "b9d84a22870d3f21c91a4c6e410c9cc51d00902f5233ad0c84011479244bf7d2",
+      "source": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/LICENSE",
+      "verification": "MIT upstream license"
+    },
+    "CC-BY-4.0-LICENSE": {
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt",
+      "verification": "DB-IP Lite license text"
+    },
+    "CC-BY-SA-4.0-LICENSE": {
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "source": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt",
+      "verification": "Official Creative Commons license text over HTTPS"
+    }
+  }
+}

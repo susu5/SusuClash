@@ -1,6 +1,26 @@
 # 本地构建说明
 
-本仓库只包含项目源码、界面资源和示例设计图，不包含 Node.js、Mihomo、WebView2 SDK 或地理规则文件的二进制副本。当前尚未提供一键下载依赖或现成发布包；请在独立测试环境中自行准备下列文件并确认其来源和许可。不要把真实订阅、运行时配置、日志或浏览器数据放进仓库。
+本仓库只包含项目源码、界面资源和示例设计图，不包含 Node.js、Mihomo、WebView2 SDK 或地理规则文件的二进制副本。Windows 安装包可从 [GitHub Releases](https://github.com/susu5/SusuClash/releases) 下载。自行构建时请在独立测试环境准备依赖并核查其来源和许可。不要把真实订阅、运行时配置、日志或浏览器数据放进仓库。
+
+## 复现 0.1.8 公开版 MSI
+
+在独立文件夹准备 `packaging/release-dependencies-v0.1.8.json` 中列出的上游文件。下表列出打包脚本需要的文件名；所有输入均按该清单验证 SHA-256，`yaml` 还须匹配锁文件 SHA-512。许可证原文位于仓库 `licenses/` 中，脚本同时核查许可文件。
+
+| 依赖文件 | 准备方式 |
+| --- | --- |
+| `node-official.exe`、`NODE-LICENSE` | 从 Node.js 24.22.1 官方 Windows x64 ZIP 提取 `node.exe` 和 `LICENSE` 并分别改名；也可从清单中的官方下载地址取得相同的 exe。 |
+| `mihomo-official.exe` | 从清单所列 Mihomo v1.19.33 compatible 官方 ZIP 提取 Windows x64 可执行文件并改名。 |
+| `geoip.dat`、`geosite.dat` | 下载清单所列 V2Fly GeoIP 与 Domain List Community 发行文件，后者将 `dlc.dat` 改名为 `geosite.dat`。 |
+| `dbip-country-lite-2026-11.mmdb`、`dbip-asn-lite-2026-11.mmdb` | 下载清单中的 DB-IP `.mmdb.gz` 并解压。 |
+| `microsoft.web.webview2.1.0.4078.44.nupkg`、`yaml-2.8.1.tgz` | 从清单中的 NuGet、npm 官方地址原样下载。 |
+
+具备下列构建工具并将 `wix` 加入 PATH，在仓库根目录运行（替换为自己的独立目录；输出文件必须尚不存在）：
+
+```powershell
+python packaging\build_msi_release.py --deps C:\release-deps --work-dir C:\release-work --output C:\release-output\SusuClash-Setup-x64-v0.1.8.msi
+```
+
+此脚本从源码重新编译窗口宿主并打包所列运行依赖，保留与 0.1.7 相同的安装位置和升级代码；不会读取用户订阅或配置，不会给 MSI 签名。详细来源、许可及归属见 [第三方声明](THIRD_PARTY_NOTICES.md)。本版 V2Fly 地理规则数据不一定包含 Mihomo Meta 专用的全部分类，使用相关规则的订阅可能需要兼容的规则数据。
 
 ## 依赖与工具
 
