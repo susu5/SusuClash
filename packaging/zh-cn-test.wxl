@@ -1,0 +1,4 @@
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="zh-CN">
+  <String Id="WelcomeEulaDlgTitle" Value="{\WixUI_Font_Title}请阅读 [ProductName] 本机测试说明"/>
+  <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="我已阅读测试说明(&amp;A)"/>
+</WixLocalization>

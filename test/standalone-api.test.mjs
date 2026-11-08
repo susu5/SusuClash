@@ -1,0 +1,130 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { createManagedCore } from '../src/managed-core.mjs';
+import { startServer } from '../src/server.mjs';
+import { createTrayPreferences } from '../src/tray.mjs';
+
+test('standalone API imports and applies a local configuration with own core', async t => {
+  if (process.platform !== 'win32') return t.skip('bundled test executable is Windows');
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'clash-app-api-'));
+  const core = createManagedCore({ directory: dir });
+  let enabled = false;
+  const systemProxy = {
+    getStatus: async () => ({ enabled, managed: enabled }),
+    enable: async port => { assert(port > 0); enabled = true; return { enabled, managed: true }; },
+    disable: async () => { enabled = false; }, restoreOnExit: async () => { enabled = false; }
+  };
+  let failLine = false;
+  const healthProbe = { inspect:async node => failLine && node === 'DIRECT' ? {network:'ok',node:'failed'} : {network:'unknown',node:'unknown'}, verify:async()=> 'ok', force(){} };
+  const codexHealth = {inspect:async()=>({result:'unknown',detail:'模拟结果',checkedAt:null})};
+  let startupEnabled = false;
+  const autostart = { getStatus:async()=>({enabled:startupEnabled,conflict:false}), enable:async()=>({enabled:startupEnabled=true,conflict:false}), disable:async()=>({enabled:startupEnabled=false,conflict:false}) };
+  const trayPreferences = createTrayPreferences({directory:dir});
+  trayPreferences.setAvailability(true);
+  let app = await startServer({ core, systemProxy, healthProbe, codexHealth, autostart, trayPreferences, automationIntervalMs:30 });
+  t.after(async () => { if (app) await app.close(); await rm(dir, { recursive: true, force: true }); });
+  const get = async url => { const r = await fetch(app.url + 'api/' + url); assert.equal(r.status,200); return r.json(); };
+  const post = async (url, value) => { const r = await fetch(app.url + 'api/' + url, {method:'POST',headers:{'Content-Type':'application/json',Origin:app.origin},body:JSON.stringify(value)}); const data = await r.json(); assert.equal(r.status,200,JSON.stringify(data)); return data; };
+  assert.equal((await get('runtime')).state,'stopped');
+  assert.equal((await get('autostart')).enabled,false);
+  assert.equal((await post('autostart',{enabled:true})).enabled,true);
+  assert.equal((await get('tray')).closeToTray,true);
+  assert.equal((await post('tray',{closeToTray:false})).closeToTray,false);
+  const added = await post('profiles/local', {name:'isolated',content:'mode: rule\nallow-lan: true\ntun:\n  enable: true\nexternal-controller: 0.0.0.0:9090\nproxies: []\nproxy-groups:\n  - name: Test\n    type: select\n    proxies: [DIRECT, REJECT]\nrules:\n  - MATCH,DIRECT\n'});
+  assert(added.id);
+  assert.equal((await get('profiles')).activeId,null);
+  await post('profiles/activate',{id:added.id});
+  assert.equal((await get('runtime')).state,'running');
+  assert.equal((await get('state')).tun,false);
+  const connections = await get('connections');
+  assert.deepEqual(connections.connections, [], '内核返回 null 时应显示零条活动连接');
+  assert.equal((await get('state')).connections.active,0);
+  assert((await get('groups')).groups.some(g=>g.name==='Test'));
+  await post('automation',{group:'Test',backups:['REJECT']});
+  const enabledAutomation = await post('automation',{group:'Test',autoSwitch:true,autoRepair:true});
+  assert.deepEqual(enabledAutomation.backups,['REJECT']);
+  assert.equal(enabledAutomation.autoSwitch,true);
+  assert.equal(enabledAutomation.autoRepair,true);
+  const invalid = await fetch(app.url+'api/automation',{method:'POST',headers:{'Content-Type':'application/json',Origin:app.origin},body:JSON.stringify({group:'Test',backups:['not-in-group']})});
+  assert.equal(invalid.status,400);
+  failLine = true;
+  for (let i=0; i<100 && (await get('groups')).groups.find(g=>g.name==='Test').current !== 'REJECT'; i++) await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal((await get('groups')).groups.find(g=>g.name==='Test').current,'REJECT');
+  assert((await get('logs')).entries.some(item=>item.message==='已尝试重新应用当前线路'));
+  let logged = false;
+  for (let i=0; i<50 && !logged; i++) {
+    logged = (await get('logs')).entries.some(item=>item.message==='已尝试自动切换备用节点');
+    if (!logged) await new Promise(resolve=>setTimeout(resolve,30));
+  }
+  assert(logged, '自动切换完成后应记录脱敏日志');
+  failLine = false;
+  assert.equal((await post('select',{group:'Test',member:'REJECT'})).current,'REJECT');
+  const blocker = net.createServer();
+  await new Promise((resolve,reject)=>blocker.once('error',reject).listen(0,'127.0.0.1',resolve));
+  const nextPort = blocker.address().port;
+  let portRequest = await fetch(app.url+'api/port',{method:'POST',headers:{'Content-Type':'application/json',Origin:app.origin},body:JSON.stringify({port:nextPort})});
+  assert.equal(portRequest.status,409);
+  await new Promise(resolve=>blocker.close(resolve));
+  assert.equal((await post('port',{port:nextPort})).port,nextPort);
+  assert.equal((await get('state')).port,nextPort);
+  assert.equal((await post('system-proxy',{enabled:true})).enabled,true);
+  portRequest = await fetch(app.url+'api/port',{method:'POST',headers:{'Content-Type':'application/json',Origin:app.origin},body:JSON.stringify({port:nextPort+1})});
+  assert.equal(portRequest.status,409);
+  assert.equal((await post('core-stop',{})).state,'stopped');
+  assert.equal(enabled,false);
+  const logs = await get('logs');
+  assert(logs.entries.some(item=>item.message==='配置已启用'));
+  assert(!JSON.stringify(logs).includes('isolated'));
+  await app.close(); app = null;
+  app = await startServer({core:createManagedCore({directory:dir}),systemProxy,healthProbe,codexHealth,autostart,automationIntervalMs:30});
+  for (let i=0; i<100 && (await get('runtime')).restoring; i++) await new Promise(resolve=>setTimeout(resolve,50));
+  assert.equal((await get('state')).port,nextPort);
+  const restored = await get('automation');
+  assert.equal(restored.group,'Test');
+  assert.equal(restored.autoSwitch,true);
+  assert.deepEqual(restored.backups,['REJECT']);
+});
+
+test('failed crash recovery is visible and blocks silent configuration restore', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'clash-recovery-test-'));
+  let recoveryFails = true, configRestored = false;
+  const core = {directory:dir, applyConfig:async()=>{}, validateConfig:async()=>{}, status:()=>({state:'stopped',message:'未启动',version:null}), stop:async()=>{}};
+  const systemProxy = {restoreOnExit:async()=>{if(recoveryFails)throw Error('fixture');}, getStatus:async()=>({enabled:false,managed:false})};
+  const profileStore = {restoreActive:async()=>{configRestored=true;},list:async()=>({activeId:null,profiles:[]})};
+  const monitor = {stop(){},invalidate(){},status:()=>({preferences:{backups:{}}})};
+  const app = await startServer({core,systemProxy,profileStore,monitor});
+  t.after(async()=>{recoveryFails=false; await app.close(); await rm(dir,{recursive:true,force:true});});
+  const response = await fetch(app.url+'api/runtime');
+  const status = await response.json();
+  assert.match(status.recoveryWarning,/系统代理恢复失败/);
+  assert.equal(configRestored,false);
+});
+
+test('shutdown waits for in-flight writes and rejects new mutations', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'clash-close-test-'));
+  const events=[];
+  let release, entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const started=new Promise(resolve=>{entered=resolve;});
+  const core = {directory:dir,applyConfig:async()=>{},validateConfig:async()=>{},status:()=>({state:'running'}),stop:async()=>events.push('core-stop')};
+  const proxy = {restoreOnExit:async()=>events.push('restore'),getStatus:async()=>({enabled:false})};
+  const profileStore = {restoreActive:async()=>{},list:async()=>({activeId:null,profiles:[]}),activate:async()=>{entered();await gate;events.push('activate-done');return {id:'fixture'};}};
+  const monitor={stop(){events.push('monitor-stop');},invalidate(){},status:()=>({preferences:{backups:{}}})};
+  const app=await startServer({core,profileStore,systemProxy:proxy,monitor});
+  t.after(async()=>{await rm(dir,{recursive:true,force:true});});
+  await new Promise(resolve=>setTimeout(resolve,20));
+  events.length=0;
+  const doPost=(route,body)=>fetch(app.url+'api/'+route,{method:'POST',headers:{Origin:app.origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const pending=doPost('profiles/activate',{id:'fixture'});
+  await started;
+  const close=app.close();
+  const refused=await doPost('core-stop',{}); assert.equal(refused.status,503);
+  assert(!events.includes('core-stop'));
+  release(); assert.equal((await pending).status,200);
+  await close;
+  assert.deepEqual(events,['monitor-stop','activate-done','restore','core-stop']);
+});

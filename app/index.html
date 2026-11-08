@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="description" content="Windows 独立代理客户端，管理本机内核、配置和连接。">
+<meta name="application-name" content="SusuClash">
+<title>SusuClash</title>
+<link rel="icon" href="icon.ico" sizes="16x16 20x20 24x24 32x32 40x40 48x48 64x64 128x128 256x256">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css"><link rel="stylesheet" href="theme-v2.css"><link rel="stylesheet" href="lines-v3.css"><link rel="stylesheet" href="settings-v2.css"><link rel="stylesheet" href="secondary-fix.css"><link rel="stylesheet" href="window-frame.css"><script src="app.js" defer></script><script src="theme-v2.js" defer></script><script src="lines-v3.js" defer></script><script src="settings-v2.js" defer></script><script src="codex-repair.js" defer></script><script src="secondary-fix.js" defer></script><script src="window-frame.js" defer></script>
+</head>
+<body data-tone="normal">
+<div class="lightfield" aria-hidden="true"></div>
+<svg hidden xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><path d="m12 3 8.5 5v8L12 21l-8.5-5V8zM4 8l8 5 8-5M12 13v8M8 6l8 5v4"/></symbol>
+  <symbol id="power" viewBox="0 0 24 24"><path d="M12 3v9m4.5-6.5a8 8 0 1 1-9 0"/></symbol>
+  <symbol id="route" viewBox="0 0 24 24"><circle cx="5" cy="17" r="2.5"/><circle cx="19" cy="7" r="2.5"/><path d="M7.5 17H15a3 3 0 0 0 0-6H9a2 2 0 0 1 0-4h7.5"/></symbol>
+  <symbol id="scan" viewBox="0 0 24 24"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4M6 12h3l2-4 2 8 2-4h3"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9H4zM9.5 19v-5h5v5"/></symbol>
+  <symbol id="connections" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.3 10.8 7.4-3.6m-7.4 6 7.4 3.6"/></symbol>
+  <symbol id="settings" viewBox="0 0 24 24"><path d="M4 6h5m4 0h7M4 12h10m4 0h2M4 18h2m4 0h10"/><circle cx="11" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+</svg>
+<div class="app">
+  <main>
+    <section class="view welcome" data-page="welcome" aria-labelledby="welcomeTitle" hidden>
+      <img src="icon.svg" class="welcome-icon" width="112" height="112" alt="SusuClash">
+      <h1 id="welcomeTitle" tabindex="-1">先添加你的订阅</h1>
+      <p>添加订阅或导入本地配置，启用后即可选择线路。</p>
+      <button type="button" class="secondary" id="welcomeAdd">添加订阅</button>
+      <button type="button" class="secondary" data-open="localImport">导入本地配置</button>
+      <button type="button" class="text-button" id="welcomeDemo">稍后添加</button>
+    </section>
+    <section class="view" data-page="home" aria-labelledby="heroTitle" hidden>
+      <div class="home-controls">
+        <div class="mode-segments" role="group" aria-label="运行模式"><button type="button" data-mode="rule" aria-pressed="true">规则</button><button type="button" data-mode="global" aria-pressed="false">全局</button><button type="button" data-mode="direct" aria-pressed="false">直连</button></div>
+        <div class="proxy-control"><span id="proxyLabel">系统代理</span><button type="button" class="switch" id="proxySwitch" role="switch" aria-labelledby="proxyLabel" aria-checked="true"><span class="track"></span></button></div>
+      </div>
+      <div class="glass hero">
+        <button class="orb" id="statusOrb" type="button" aria-label="当前线路异常，查看问题检测" disabled>
+          <svg class="orbit" viewBox="0 0 184 174">
+            <circle cx="92" cy="87" r="75"/><circle cx="92" cy="87" r="67"/>
+            <path class="bright-arc" d="M26 51A75 75 0 0 1 110 14M157 126a75 75 0 0 1-77 35"/>
+            <path class="index" d="M92 8v7m0 144v7M13 87h7m144 0h7"/>
+            <circle class="point" cx="156" cy="48" r="2"/><circle class="point" cx="41" cy="132" r="2"/>
+          </svg>
+          <div class="lens"></div>
+        </button>
+        <h1 id="heroTitle" tabindex="-1">正在连接</h1>
+        <p class="hero-sub"><span id="heroSubLead"></span><strong id="heroSubDetail">正在读取内核状态</strong></p>
+        <dl class="stats" aria-label="网络读数">
+          <div><dt>代理端口</dt><dd id="port">—</dd></div>
+          <div><dt>下载速率</dt><dd><span id="download">—</span></dd></div>
+          <div><dt>线路延迟</dt><dd id="heroLatency">—</dd></div>
+        </dl>
+      </div>
+      <div class="glass stack">
+        <div class="row">
+          <span class="row-icon"><svg class="icon" aria-hidden="true"><use href="#route"/></svg></span>
+          <div class="row-copy"><span class="row-label" id="nodeName">尚未选择线路</span><p class="hint">当前线路</p></div>
+          <button type="button" class="text-button" data-open="lines">切换线路</button>
+        </div>
+      </div>
+    </section>
+    <section class="view" data-page="lines" aria-labelledby="linesTitle" hidden>
+      <h1 class="visually-hidden" id="linesTitle">线路</h1>
+      <div class="subscription" tabindex="-1"><div class="row-copy"><span class="row-label" id="lineSubscriptionName">尚未启用配置</span><p class="hint" id="subscriptionHint">添加订阅或导入配置</p></div><button type="button" class="secondary" id="update">管理订阅</button></div>
+      <div class="line-toolbar"><label for="strategyGroup" class="row-label">策略组</label><select class="mode-select" id="strategyGroup" aria-label="选择策略组" disabled></select></div>
+      <label class="line-search"><span aria-hidden="true">⌕</span><input id="lineSearch" type="search" placeholder="搜索线路名称" aria-label="搜索线路名称"></label><div class="line-toolbar"><span class="row-label">线路测试</span><button type="button" class="secondary" id="ping">全部测速</button></div>
+      <div class="line-filters" aria-label="筛选线路"><button type="button" class="line-filter" data-filter="all" aria-pressed="true">全部</button><button type="button" class="line-filter" data-filter="backup" aria-pressed="false">备用</button><button type="button" class="line-filter" data-filter="normal" aria-pressed="false">正常</button><button type="button" class="line-filter" data-filter="abnormal" aria-pressed="false">异常</button></div>
+      <div class="line-sort"><span id="lineStatus" role="status">等待线路数据</span><select id="lineSort" aria-label="线路排序" hidden><option value="low">延迟从低到高</option><option value="high">延迟从高到低</option></select><button id="lineSortToggle" class="secondary" type="button" aria-label="当前延迟从低到高，点击切换从高到低">延迟 ↑</button><button id="lineViewToggle" class="secondary" type="button" aria-label="切换双列展示">▦ 双列</button></div>
+      <div class="glass nodes" id="nodes" aria-label="可用线路"></div>
+    </section>
+    <section class="view" data-page="connections" aria-labelledby="connectionsTitle" hidden>
+      <header class="heading connection-heading" tabindex="-1"><h1 id="connectionsTitle">连接</h1><span class="connection-count" id="connectionCount"></span></header>
+      <label class="connection-search"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg><input id="connectionSearch" type="search" placeholder="搜索应用或地址" aria-label="搜索应用或地址"></label>
+      <div class="section-label">按应用查看 <span>仅显示内核可见的当前连接</span></div>
+      <div class="connection-list" id="connectionList" aria-label="当前连接列表" aria-live="polite"></div>
+    </section>
+    <section class="view" data-page="connectionApp" aria-labelledby="connectionAppTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="connections">‹ 返回连接</button><h1 id="connectionAppTitle"></h1><p id="connectionAppCount"></p></div></header>
+      <div class="section-label">当前连接 <span>点击查看详情</span></div>
+      <div class="connection-list" id="connectionAppList" aria-label="应用的当前连接" aria-live="polite"></div>
+    </section>
+    <section class="view" data-page="connectionDetail" aria-labelledby="connectionDetailTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="connectionApp">‹ 返回应用</button><h1 id="connectionDetailTitle">连接详情</h1></div></header>
+      <div class="detail-summary"><h2 id="detailAddress"></h2><p id="detailApp"></p></div>
+      <p class="hint" id="detailUnavailable" role="status" hidden>连接数据暂不可用，稍后将自动重试。</p>
+      <dl class="detail-fields"><div><dt>连接状态</dt><dd id="detailConnectionState">连接中</dd></div><div><dt>连接方式</dt><dd id="detailRoute"></dd></div><div><dt>连接时长</dt><dd id="detailDuration"></dd></div><div><dt>上传 / 下载</dt><dd id="detailTraffic"></dd></div></dl>
+      <button type="button" class="disconnect" id="disconnectOne">断开此连接</button>
+      <p class="hint">断开后，应用可能自动重新连接。</p>
+    </section>
+    <section class="view" data-page="settings" aria-labelledby="settingsTitle" hidden>
+      <header class="heading" tabindex="-1"><div><h1 id="settingsTitle">设置</h1><p>管理自动处理和基础选项。</p></div></header>
+      <p class="warning-inline" id="settingsRuntimeWarning" role="status" hidden></p>
+      <div class="section-label">订阅</div>
+      <button type="button" class="sub-entry" data-open="subscriptions"><span class="row-icon"><svg class="icon" aria-hidden="true"><use href="#route"/></svg></span><span class="row-copy"><span class="row-label">订阅管理</span><span class="hint">新建、更新和管理订阅</span></span><span class="chevron" aria-hidden="true">›</span></button>
+      <div class="section-label">自动处理 <span id="automationInterval"></span></div>
+      <div class="glass stack">
+        <div class="row"><div class="row-copy"><span class="row-label" id="autoRepairLabel">自动修复</span><p class="hint">按问题类型尝试重连与复查</p></div><button type="button" class="switch" id="autoRepairSwitch" role="switch" aria-labelledby="autoRepairLabel" aria-checked="false"><span class="track"></span></button></div>
+        <div class="row"><div class="row-copy"><span class="row-label">备用节点</span><p class="hint" id="backupSummary">尚未设置</p></div><button type="button" class="text-button" data-open="backups">选择并排序</button></div>
+        <ol class="backup-preview" id="backupPreview" aria-label="备用节点顺序" hidden></ol>
+        <div class="row"><div class="row-copy"><span class="row-label" id="autoSwitchLabel">自动切换</span><p class="hint" id="autoSwitchHint">先选择至少一个备用节点</p></div><button type="button" class="switch" id="autoSwitch" role="switch" aria-labelledby="autoSwitchLabel" aria-describedby="autoSwitchHint" aria-checked="false" disabled><span class="track"></span></button></div>
+      </div>
+      <details class="target-details"><summary>自动检测目标</summary><p class="hint">线路：<span id="settingsTargets">正在读取</span><br>Codex 站点：<span id="settingsCodexTarget">正在读取</span></p></details>
+      <div class="section-label">基础设置</div>
+      <div class="glass stack">
+        <div class="row"><div class="row-copy"><span class="row-label">混合端口</span><p class="hint">代理当前使用的端口</p></div><span class="latency" id="settingsPort">7890</span><button type="button" class="text-button" id="editPort" aria-expanded="false" aria-controls="portForm">修改</button></div>
+        <form class="port-form" id="portForm" hidden novalidate>
+          <label for="portInput">新端口<input id="portInput" type="number" min="1" max="65535" inputmode="numeric" required aria-describedby="portError"></label>
+          <button type="submit" class="secondary">保存</button><button type="button" class="text-button" id="cancelPort">取消</button>
+          <p class="port-error" id="portError" role="status"></p>
+        </form>
+        <div class="row"><div class="row-copy"><span class="row-label" id="tunLabel">TUN 模式</span><p class="hint">使用虚拟网卡接管流量</p></div><button type="button" class="switch" id="tunSwitch" role="switch" aria-labelledby="tunLabel" aria-checked="true"><span class="track"></span></button></div>
+        <div class="row"><div class="row-copy"><span class="row-label" id="startupLabel">开机启动</span><p class="hint">登录 Windows 后打开 SusuClash</p></div><button type="button" class="switch" data-local-switch="开机启动" role="switch" aria-labelledby="startupLabel" aria-checked="false"><span class="track"></span></button></div>
+        <div class="row"><div class="row-copy"><span class="row-label" id="trayLabel">关闭窗口时留在托盘</span><p class="hint">程序继续运行，可从托盘退出</p></div><button type="button" class="switch" data-local-switch="关闭窗口时留在托盘" role="switch" aria-labelledby="trayLabel" aria-checked="true"><span class="track"></span></button></div>
+        <div class="row"><div class="row-copy"><span class="row-label" id="autoLabel">自动更新订阅</span><p class="hint" id="autoHint">已关闭</p></div><button type="button" class="switch" data-local-switch="自动更新订阅" role="switch" aria-labelledby="autoLabel" aria-checked="false"><span class="track"></span></button></div>
+      </div>
+      <div class="section-label">运行环境</div>
+      <button type="button" class="sub-entry" data-open="runtime"><span class="row-icon"><svg class="icon" aria-hidden="true"><use href="#settings"/></svg></span><span class="row-copy"><span class="row-label">内核与权限</span><span class="hint">查看运行环境与权限</span></span><span class="chevron" aria-hidden="true">›</span></button>
+      <button type="button" class="sub-entry" data-open="logs"><span class="row-icon"><svg class="icon" aria-hidden="true"><use href="#scan"/></svg></span><span class="row-copy"><span class="row-label">运行日志</span><span class="hint">查看本次运行记录</span></span><span class="chevron" aria-hidden="true">›</span></button>
+      <button type="button" class="sub-entry" data-open="about"><span class="row-icon"><svg class="icon" aria-hidden="true"><use href="#mark"/></svg></span><span class="row-copy"><span class="row-label">关于</span><span class="hint">作者与应用信息</span></span><span class="chevron" aria-hidden="true">›</span></button>
+    </section>
+    <section class="view" data-page="runtime" aria-labelledby="runtimeTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="settings">‹ 返回设置</button><h1 id="runtimeTitle">内核与权限</h1><p>独立客户端的运行环境</p></div></header>
+      <div class="glass stack runtime-list">
+        <div class="row"><div class="row-copy"><span class="row-label">代理内核</span><p class="hint">由本软件管理启动与停止</p></div><span class="result" id="runtimeCoreState">未配置</span></div>
+        <div class="row"><div class="row-copy"><span class="row-label">TUN 权限</span><p class="hint">启用时可能需要系统授权</p></div><span class="result" id="runtimeTunState">未检查</span></div>
+        <div class="row"><div class="row-copy"><span class="row-label">系统代理</span><p class="hint">与 TUN 分别控制</p></div><span class="result" id="runtimeProxyState">已关闭</span></div>
+      </div>
+      <div class="runtime-actions"><button type="button" class="secondary" id="restartCore">启动内核</button><button type="button" class="text-button" id="stopCore">停止内核</button><button type="button" class="text-button" data-open="logs">查看运行日志</button></div>
+      <p class="sub-warning">TUN 权限管理尚未接入。</p>
+    </section>
+    <section class="view" data-page="logs" aria-labelledby="logsTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="settings">‹ 返回设置</button><h1 id="logsTitle">运行日志</h1><p>记录配置与运行过程</p></div><button type="button" class="secondary" id="refreshLogs">刷新</button></header>
+      <div class="log-filter" aria-label="日志筛选"><button type="button" data-log-filter="all" aria-pressed="true">全部</button><button type="button" data-log-filter="error" aria-pressed="false">异常</button></div>
+      <label class="line-sort">时间范围<select id="logPeriod" aria-label="日志时间范围"><option value="all">全部时间</option><option value="hour">最近一小时</option><option value="today">今天</option><option value="week">最近七天</option></select></label>
+      <div class="log-list" id="runtimeLogList" aria-live="polite"></div>
+      <p class="sub-warning">日志中可能包含的链接、凭证和地址会被隐藏。</p>
+    </section>
+    <section class="view about-page" data-page="about" aria-labelledby="aboutTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="settings">‹ 返回设置</button><h1 id="aboutTitle">关于</h1></div></header>
+      <a class="project-poster" href="https://susu5.cn" target="_blank" rel="noopener noreferrer" aria-label="100 个 AI 落地项目，访问 susu5 个人主页，在新窗口打开">
+        <span class="poster-grid" aria-hidden="true"></span><span class="poster-top"><span>SUSU5 / AI PROJECTS</span><span aria-hidden="true">✳</span></span>
+        <span class="poster-number" aria-hidden="true">100</span><span class="poster-title"><span class="poster-small">100 个</span><strong>AI 落地项目</strong></span>
+        <span class="poster-bottom"><span><small>作者</small><b>susu5</b></span><span class="poster-arrow">访问个人主页 <span aria-hidden="true">↗</span></span></span>
+      </a>
+      <div class="about-section">联系作者</div>
+      <div class="contact-card">
+        <div class="contact-row"><span class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5 3 12l5 7M16 5l5 7-5 7M14 4 10 20"/></svg></span><div class="contact-info"><span>GitHub</span><strong>github.com/susu5</strong></div><a class="contact-link" href="https://github.com/susu5" target="_blank" rel="noopener noreferrer" aria-label="访问 susu5 的 GitHub 主页，在新窗口打开">访问 <span aria-hidden="true">↗</span></a></div>
+        <div class="contact-row"><span class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 4-3.5 7-8 7-1.2 0-2.2-.2-3-.5L5 18l.8-3A6.7 6.7 0 0 1 4 10c0-4 3.6-7 8-7s8 3 8 7Z"/><path d="M9 9h.01M15 9h.01"/></svg></span><div class="contact-info"><span>微信</span><strong>sunbacon</strong></div><button type="button" class="contact-copy" data-copy="sunbacon" aria-label="复制微信 sunbacon">复制</button></div>
+        <div class="contact-row"><span class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M8 20a3 3 0 0 1 0-6h11M9 8h6"/></svg></span><div class="contact-info"><span>公众号</span><strong>根叔分享</strong></div><button type="button" class="contact-copy" data-copy="根叔分享" aria-label="复制公众号 根叔分享">复制</button></div>
+      </div>
+      <p class="author-feedback" role="status" aria-live="polite"></p>
+      <div class="about-section">应用与内核信息</div>
+      <dl class="detail-fields about-versions"><div><dt>应用版本</dt><dd id="aboutAppVersion">—</dd></div><div><dt>代理内核</dt><dd id="aboutCoreVersion">—</dd></div></dl>
+      <button type="button" class="secondary" id="checkAppUpdate" hidden>检查更新</button>
+    </section>
+    <section class="view" data-page="localImport" aria-labelledby="localImportTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="subscriptions">‹ 返回订阅管理</button><h1 id="localImportTitle">导入本地配置</h1><p>从文件导入已有配置</p></div></header>
+      <div class="glass stack"><div class="row"><div class="row-copy"><span class="row-label">选择配置文件</span><p class="hint">先检查文件内容，再决定是否启用</p></div></div></div>
+      <button type="button" class="secondary" id="selectLocalFile">选择文件</button>
+      <p class="sub-warning">选择 YAML 配置文件；导入后由你决定是否启用。</p><input type="file" id="configFile" accept=".yaml,.yml,text/yaml,text/plain" hidden>
+    </section>
+    <section class="view" data-page="subscriptions" aria-labelledby="subscriptionsTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="settings">‹ 返回设置</button><h1 id="subscriptionsTitle">订阅管理</h1><p>选择和管理你的订阅</p></div><button type="button" class="secondary" id="newSubscription">新建订阅</button></header>
+      <div class="section-label">订阅列表 <span id="subscriptionCount"></span></div>
+      <div class="glass stack" id="subscriptionList"></div>
+      <button type="button" class="text-button" data-open="localImport">导入本地配置</button>
+      <p class="sub-warning">订阅链接可能包含凭证，列表不会显示完整链接。</p>
+    </section>
+    <section class="view" data-page="subscriptionDetail" aria-labelledby="subDetailTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="subscriptions">‹ 返回订阅</button><h1 id="subDetailTitle">订阅详情</h1></div></header>
+      <div class="glass stack sub-detail"><div class="row"><div class="row-copy"><span class="row-label" id="subDetailName"></span><p class="hint" id="subDetailState"></p></div></div></div>
+      <p class="sub-warning" id="subDetailExplanation"></p>
+      <div class="sub-detail-actions"><button type="button" class="secondary" id="selectSubscription">设为当前</button><button type="button" class="secondary" id="editSubscription">编辑</button><button type="button" class="secondary" id="updateSubscription">更新订阅</button><button type="button" class="text-button" id="deleteSubscription">删除</button></div>
+    </section>
+    <section class="view" data-page="subscriptionForm" aria-labelledby="subFormTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" id="cancelSubscriptionForm">‹ 取消</button><h1 id="subFormTitle">新建订阅</h1><p>输入名称和订阅链接</p></div></header>
+      <form class="sub-form" id="subscriptionForm" novalidate>
+        <label class="sub-field" for="subName">订阅名称<input id="subName" maxlength="60" autocomplete="off" placeholder="例如：我的订阅"><span class="hint">方便你在线路列表中识别</span></label>
+        <label class="sub-field" for="subUrl">订阅链接<input id="subUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://…"><span class="hint">链接通常包含访问凭证，请妥善保管</span></label>
+        <p class="sub-error" id="subFormError" role="alert"></p>
+        <button type="submit" class="secondary" id="saveSubscription">保存订阅</button>
+        <p class="sub-warning">添加并验证成功后，可选择是否启用。</p>
+      </form>
+    </section>
+    <section class="view" data-page="backups" aria-labelledby="backupsTitle" hidden>
+      <header class="heading backup-heading" tabindex="-1">
+        <div><button type="button" class="text-button return-link" id="cancelBackups">‹ 取消</button><h1 id="backupsTitle">备用节点</h1><p id="backupGroupLabel">策略组</p></div>
+        <button type="button" class="secondary" id="saveBackups">保存</button>
+      </header>
+      <div class="section-label">尝试顺序 <span id="draftCount">已选 0 个</span></div>
+      <div class="glass backup-list" id="backupList" aria-label="备用节点尝试顺序"></div>
+      <p class="hint">按住右侧手柄拖动排序，越靠上越先尝试。</p>
+      <div class="section-label">添加节点 <span>当前线路会自动跳过</span></div>
+      <div class="glass available-list" id="availableNodes" aria-label="可添加的节点"></div>
+    </section>
+    <section class="view" data-page="check" aria-labelledby="checkTitle" hidden>
+      <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="home">‹ 返回首页</button><h1 id="checkTitle">问题检测</h1><p>查看当前问题及处理结果</p></div><button type="button" class="secondary" id="runCheck">重新检测</button></header>
+      <p class="warning-inline" id="checkRuntimeWarning" role="status" hidden></p>
+      <div class="glass notice" id="notice" hidden>
+        <h2 id="resultTitle"></h2><p id="resultCopy"></p><ul id="repairSteps"></ul>
+        <button type="button" class="text-button" id="checkSettings" data-open="settings" hidden>自动处理设置 →</button><button type="button" class="text-button" id="checkLines" data-open="lines" hidden>选择线路 →</button>
+      </div>
+      <p id="automationStatus" class="hint" aria-live="polite"></p>
+      <p class="hint">线路检测目标：<span id="checkTargets">正在读取</span><br>Codex 站点检测目标：<span id="checkCodexTarget">正在读取</span></p>
+      <details class="target-details"><summary>自动检查详情</summary><p id="autoCheckedTime" class="hint"></p><div class="glass stack" id="autoChecks"></div></details>
+      <ul class="glass stack results" aria-label="检测项">
+        <li class="row"><span class="row-copy row-label">本机网络</span><span class="result" data-result></span></li>
+        <li class="row"><span class="row-copy row-label">代理端口</span><span class="result" data-result></span></li>
+        <li class="row"><span class="row-copy row-label">代理内核</span><span class="result" data-result></span></li>
+        <li class="row"><span class="row-copy row-label">当前线路</span><span class="result" data-result></span></li>
+        <li class="row"><span class="row-copy row-label">Codex 连接</span><span class="result" data-result></span></li>
+      </ul>
+      <p class="hint">健康检查每 5 秒进行；线路深度检测限频。只有综合多个目标和直连结果确认节点故障，才会尝试自动切换。检测不能代替 Codex 应用内测试。</p>
+    </section>
+  </main>
+  <nav class="glass tabs" aria-label="主导航">
+    <button type="button" data-open="home" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#home"/></svg>首页</button>
+    <button type="button" data-open="lines"><svg class="icon" aria-hidden="true"><use href="#route"/></svg>线路</button>
+    <button type="button" data-open="connections"><svg class="icon" aria-hidden="true"><use href="#connections"/></svg>连接</button>
+    <button type="button" data-open="settings"><svg class="icon" aria-hidden="true"><use href="#settings"/></svg>设置</button>
+  </nav>
+  <p class="preview-note">正在连接本地服务</p>
+  <div class="sr-only" role="status" id="announcement"></div>
+</div>
+<div class="glass toast" id="toast" role="status" hidden></div>
+<dialog class="glass detail-dialog" id="connectionDialog" aria-labelledby="detailTitle" aria-describedby="detailCopy">
+  <h2 id="detailTitle">断开此连接？</h2><p id="detailCopy">该应用可能会自动重新连接。</p>
+  <div class="dialog-actions"><button type="button" class="secondary" id="cancelDisconnect">取消</button><button type="button" class="text-button" id="confirmDisconnect">断开连接</button></div>
+</dialog>
+<dialog class="glass detail-dialog" id="stopCoreDialog" aria-labelledby="stopCoreTitle"><h2 id="stopCoreTitle">停止代理内核？</h2><p>当前代理连接将中断，软件会尝试恢复由本软件管理的系统代理设置。</p><div class="dialog-actions"><button type="button" class="secondary" id="cancelStopCore">取消</button><button type="button" class="text-button" id="confirmStopCore">停止内核</button></div></dialog>
+<dialog class="glass detail-dialog" id="discardDialog" aria-labelledby="discardTitle" aria-describedby="discardCopy">
+  <h2 id="discardTitle">放弃未保存的修改？</h2>
+  <p id="discardCopy">备用节点的选择和顺序还没有保存。</p>
+  <div class="dialog-actions"><button type="button" class="secondary" id="keepEditing">继续编辑</button><button type="button" class="text-button" id="discardChanges">放弃修改</button></div>
+</dialog>
+<dialog class="glass detail-dialog" id="subDiscardDialog" aria-labelledby="subDiscardTitle"><h2 id="subDiscardTitle">放弃未保存的订阅？</h2><p>填写的内容尚未保存。</p><div class="dialog-actions"><button type="button" class="secondary" id="subKeepEditing">继续编辑</button><button type="button" class="text-button" id="subDiscard">放弃修改</button></div></dialog>
+<dialog class="glass detail-dialog" id="subDeleteDialog" aria-labelledby="subDeleteTitle"><h2 id="subDeleteTitle">删除这条配置？</h2><p id="subDeleteCopy">确认删除配置？</p><div class="dialog-actions"><button type="button" class="secondary" id="subKeep">取消</button><button type="button" class="text-button" id="subDeleteConfirm">删除</button></div></dialog>
+<dialog class="detail-dialog" id="modeDialog" aria-labelledby="modeDialogTitle"><h2 id="modeDialogTitle">运行模式</h2><p>选择流量的处理方式</p><div id="modeDialogContent"></div><button class="secondary" id="closeModeDialog" type="button">关闭</button></dialog><dialog class="detail-dialog" id="updateDialog" aria-labelledby="updateDialogTitle"><h2 id="updateDialogTitle">更新订阅</h2><p id="updateDialogStatus" role="status">正在获取订阅配置与线路信息…</p><button class="secondary" id="closeUpdateDialog" type="button" disabled>更新中…</button></dialog></body></html>
