@@ -15,6 +15,7 @@ import { createTrayPreferences } from './tray.mjs';
 import { createCodexHealth, codexTarget } from './codex-health.mjs';
 import { createCodexRepair } from './codex-repair.mjs';
 import { createThemePreferences } from './theme-preferences.mjs';
+import { createUpdateChecker } from './update-check.mjs';
 
 const appVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version;
 
@@ -32,6 +33,8 @@ const assets = {
   'secondary-fix.js': ['secondary-fix.js', 'application/javascript; charset=utf-8'],
   'window-frame.css': ['window-frame.css', 'text/css; charset=utf-8'],
   'window-frame.js': ['window-frame.js', 'application/javascript; charset=utf-8'],
+  'update-check.css': ['update-check.css', 'text/css; charset=utf-8'],
+  'update-check.js': ['update-check.js', 'application/javascript; charset=utf-8'],
   'codex-repair.js': ['codex-repair.js', 'application/javascript; charset=utf-8'],
   'cat-motion.gif': ['cat-motion.gif', 'image/gif'],
   'fish-motion.gif': ['fish-motion.gif', 'image/gif'],
@@ -123,7 +126,7 @@ async function httpProviders(core) {
   return Object.entries(response?.providers ?? {}).filter(([, data]) => data?.vehicleType === 'HTTP').map(([name]) => name);
 }
 
-export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, codexRepairService, autostart, trayPreferences, themePreferences, automationIntervalMs = 5000 } = {}) {
+export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, codexRepairService, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, automationIntervalMs = 5000 } = {}) {
   const managed = typeof core.applyConfig === 'function';
   const codexRepair = codexRepairService || createCodexRepair({core});
   const profiles = profileStore || (managed ? createProfileStore({ directory: path.join(core.directory, 'profiles'), validateConfig: core.validateConfig, applyConfig: core.applyConfig }) : null);
@@ -131,6 +134,13 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   const startup = autostart || (managed ? createAutostart() : null);
   const tray = trayPreferences || (managed ? createTrayPreferences({directory:core.directory}) : null);
   const theme = themePreferences || (managed ? createThemePreferences({directory:core.directory}) : null);
+  const updates = updateChecker || createUpdateChecker({currentVersion:appVersion, request:updateRequest, getManagedProxy:async()=>{
+    if (!managed || !proxy || core.status()?.state !== 'running') return null;
+    const status=await proxy.getStatus();
+    if (!status?.enabled || !status?.managed) return null;
+    const config=await core.call('GET','/configs');
+    return portNumber(config?.['mixed-port']);
+  }});
   const token = randomBytes(24).toString('base64url');
   const prefix = '/' + token + '/';
   const contents = Object.fromEntries(await Promise.all(Object.entries(assets).map(async ([route, [filename, type]]) =>
@@ -314,6 +324,7 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   }
 
   const reads = {
+    'update-check': async () => updates.check(),
     theme: async () => theme ? theme.get() : {theme:'cat'},
     state,
     logs: async () => ({entries:logEntries}),

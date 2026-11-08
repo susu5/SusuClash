@@ -96,7 +96,11 @@ internal sealed class SusuWindow : Form
         Uri u;
         if (!Uri.TryCreate(value, UriKind.Absolute, out u) || u.Scheme != "https" || !u.IsDefaultPort || u.UserInfo.Length != 0) return false;
         if (u.Host.Equals("susu5.cn", StringComparison.OrdinalIgnoreCase)) return u.AbsolutePath == "/";
-        return u.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) && u.AbsolutePath.TrimEnd('/') == "/susu5";
+        if (!u.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)) return false;
+        string path = u.AbsolutePath.TrimEnd('/');
+        return (path.Equals("/susu5", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/susu5/SusuClash/releases", StringComparison.OrdinalIgnoreCase)) &&
+               u.Query.Length == 0 && u.Fragment.Length == 0;
     }
     private static void OpenExternal(string value)
     {
@@ -193,7 +197,7 @@ internal sealed class SusuWindow : Form
                         if (!IsWindowVisible(Handle)) throw new Exception();
                         if (!GetWindowRect(Handle, out win) || !GetClientRect(Handle, out client) || !ClientToScreen(Handle, ref origin)) throw new Exception();
                         File.WriteAllText(Path.Combine(profile, "window-metrics.txt"), String.Join(",", new[] {win.Left,win.Top,win.Right,win.Bottom,origin.X,origin.Y,client.Right,client.Bottom}));
-                        if (!AllowedExternal("https://susu5.cn/") || !AllowedExternal("https://github.com/susu5") || AllowedExternal("https://susu5.cn.example.test/") || AllowedExternal("http://susu5.cn/") || AllowedExternal("https://github.com/another")) throw new Exception();
+                        if (!AllowedExternal("https://susu5.cn/") || !AllowedExternal("https://github.com/susu5") || !AllowedExternal("https://github.com/susu5/SusuClash/releases") || AllowedExternal("https://github.com/susu5/SusuClash/releases/evil") || AllowedExternal("https://github.com/susu5/SusuClash/releases?token=x") || AllowedExternal("https://susu5.cn.example.test/") || AllowedExternal("http://susu5.cn/") || AllowedExternal("https://github.com/another")) throw new Exception();
                         await core.ExecuteScriptAsync("window.chrome.webview.postMessage('theme:whale')");
                         await Task.Delay(200);
                         if (BackColor != ColorTranslator.FromHtml("#192641")) throw new Exception();
