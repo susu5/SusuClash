@@ -35,8 +35,20 @@ def digest(path):
         for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
     return h.hexdigest()
 
+def check_design_system(node, yaml_module_root):
+    """Validate the approved style contract with already verified build inputs."""
+    design_env = os.environ.copy()
+    # The reviewed yaml archive has already been extracted to <root>/yaml.
+    # This keeps the check usable in a clean source snapshot without npm install.
+    design_env['NODE_PATH'] = str(yaml_module_root)
+    subprocess.run(
+        [str(node), str(SOURCE/'scripts'/'design-system.cjs'), 'check'],
+        cwd=str(SOURCE), env=design_env, check=True, timeout=30,
+        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+    )
+
 def main():
-    parser=argparse.ArgumentParser(description='Build SusuClash 0.1.9 from reviewed upstream dependencies')
+    parser=argparse.ArgumentParser(description='Build SusuClash from reviewed upstream dependencies')
     parser.add_argument('--deps',required=True,help='directory containing the verified upstream files')
     parser.add_argument('--output',required=True,help='new .msi output path; existing files will not be overwritten')
     parser.add_argument('--work-dir',required=True,help='directory for temporary compiled inputs and WiX source')
@@ -45,10 +57,14 @@ def main():
     if not deps.is_dir():raise SystemExit('Dependency directory not found')
     working.mkdir(parents=True,exist_ok=True);output.parent.mkdir(parents=True,exist_ok=True)
     data=json.loads((SOURCE/'package.json').read_text(encoding='utf8'))
-    if data.get('version')!='0.1.9' or data.get('license')!='GPL-3.0-only':
+    version=data.get('version','')
+    if not re.fullmatch(r'\d+\.\d+\.\d+',version) or data.get('license')!='GPL-3.0-only':
         raise SystemExit('Unexpected release version or license')
+    major,minor,build=map(int,version.split('.'))
+    if major>255 or minor>255 or build>65535:raise SystemExit('Version exceeds MSI limits')
     if output.exists(): raise SystemExit('Refusing to overwrite an existing public release MSI')
-    manifest=json.loads((SOURCE/'packaging'/'release-dependencies-v0.1.8.json').read_text(encoding='utf8'))
+    manifest_name='release-dependencies-v'+version+'.json'
+    manifest=json.loads((SOURCE/'packaging'/manifest_name).read_text(encoding='utf8'))
     required=['node-official.exe','NODE-LICENSE','mihomo-official.exe','geoip.dat','geosite.dat',
               'dbip-country-lite-2026-11.mmdb','dbip-asn-lite-2026-11.mmdb',
               'microsoft.web.webview2.1.0.4078.44.nupkg','yaml-2.8.1.tgz']
@@ -66,10 +82,11 @@ def main():
 
     legal=SOURCE/'licenses'
     legal_names=['Mihomo-GPL-3.0.txt','Node-LICENSE.txt','V2Fly-GeoIP-CC-BY-SA-4.0.txt',
-                 'V2Fly-GeoSite-MIT.txt','DB-IP-CC-BY-4.0.txt','CC-BY-SA-4.0.txt',
+                 'V2Fly-GeoSite-MIT.txt','MetaCubeX-GeoSite-GPL-3.0.txt','DB-IP-CC-BY-4.0.txt','CC-BY-SA-4.0.txt',
                  'WebView2-LICENSE.txt','WebView2-NOTICE.txt','yaml-ISC.txt']
     legal_inputs={'Mihomo-GPL-3.0.txt':'MIHOMO-LICENSE','Node-LICENSE.txt':'NODE-LICENSE',
                   'V2Fly-GeoIP-CC-BY-SA-4.0.txt':'V2FLY-GEOIP-LICENSE','V2Fly-GeoSite-MIT.txt':'V2FLY-GEOSITE-LICENSE',
+                  'MetaCubeX-GeoSite-GPL-3.0.txt':'METACUBEX-GEOSITE-LICENSE',
                   'DB-IP-CC-BY-4.0.txt':'CC-BY-4.0-LICENSE','CC-BY-SA-4.0.txt':'CC-BY-SA-4.0-LICENSE',
                   'WebView2-LICENSE.txt':'WEBVIEW2-LICENSE.txt','WebView2-NOTICE.txt':'WEBVIEW2-NOTICE.txt'}
     for name in legal_names:
@@ -79,6 +96,23 @@ def main():
             raise SystemExit('Mismatched license notice: '+name)
 
     work=Path(tempfile.mkdtemp(prefix='public-msi-build-',dir=working))
+    geodata_manifest=SOURCE/'runtime'/'geodata.json'
+    geodata=json.loads(geodata_manifest.read_text(encoding='utf8'))
+    if geodata.get('version')!=1 or geodata.get('geosite',{}).get('sha256')!=artifacts['geosite.dat']['sha256']:
+        raise SystemExit('Runtime geodata manifest does not match the reviewed database')
+    # Validate the DNS fallback and Meta categories that regressed in 0.1.9.
+    probe=work/'geodata-probe';probe.mkdir()
+    import shutil
+    for name in ['geoip.dat','geosite.dat']:
+        shutil.copyfile(deps/name,probe/name)
+    shutil.copyfile(deps/'dbip-country-lite-2026-11.mmdb',probe/'Country.mmdb')
+    shutil.copyfile(deps/'dbip-asn-lite-2026-11.mmdb',probe/'ASN.mmdb')
+    probe_config=probe/'compat.yaml'
+    probe_config.write_text('mode: rule\nmixed-port: 0\ndns:\n  enable: true\n  nameserver: [1.1.1.1]\n  fallback: [8.8.8.8]\n  fallback-filter:\n    geoip: false\n    geosite: [gfw]\nrules:\n  - GEOSITE,apple-cn,DIRECT\n  - GEOSITE,google-cn,DIRECT\n  - GEOSITE,cn,DIRECT\n  - MATCH,DIRECT\n',encoding='utf8')
+    probe_result=subprocess.run([str(deps/'mihomo-official.exe'),'-d',str(probe),'-f',str(probe_config),'-t'],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=20,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    if probe_result.returncode:
+        print(probe_result.stdout);print(probe_result.stderr)
+        raise SystemExit('GeoSite DNS/Meta compatibility probe failed')
     unpack=work/'unpacked';unpack.mkdir()
     files={}
     def add(rel,source):
@@ -88,7 +122,7 @@ def main():
         if any(p.lower() in {'profiles','subscriptions','configs','config','logs','.env','.git','sessions'} for p in rel.parts):
             raise SystemExit('Potentially private input refused: '+str(rel))
         files[rel]=source
-    for name in ['Start-Clash-Glass.cmd','package.json','README.md','LICENSE','THIRD_PARTY_NOTICES.md']:
+    for name in ['Start-Clash-Glass.cmd','恢复SusuClash.cmd','package.json','README.md','LICENSE','THIRD_PARTY_NOTICES.md']:
         add(name,SOURCE/name)
     for folder,suffixes in [('app',{'.html','.css','.js','.svg','.png','.gif','.webp','.ico','.woff2'}),('src',{'.mjs','.ps1','.cs'})]:
         base=SOURCE/folder
@@ -115,6 +149,7 @@ def main():
     add('runtime/mihomo.exe',deps/'mihomo-official.exe')
     for rel,name in [('runtime/geoip.dat','geoip.dat'),('runtime/geosite.dat','geosite.dat'),
                      ('runtime/Country.mmdb','dbip-country-lite-2026-11.mmdb'),('runtime/ASN.mmdb','dbip-asn-lite-2026-11.mmdb')]:add(rel,deps/name)
+    add('runtime/geodata.json',geodata_manifest)
     # Existing MSI builder requires this path. Its contents are generated from
     # the reviewed notice, not from any existing user runtime directory.
     runtime_readme=unpack/'runtime-readme.md'
@@ -133,8 +168,9 @@ def main():
             dest.write_bytes(archive.extractfile(member).read());add(Path('node_modules/yaml')/sub,dest)
     yaml_pkg=unpack/'yaml'/'package.json'
     if json.loads(yaml_pkg.read_text(encoding='utf8')).get('version')!='2.8.1':raise SystemExit('Unexpected yaml package version')
+    check_design_system(node, unpack)
     for name in legal_names:add(Path('licenses')/name,legal/name)
-    add('packaging/release-dependencies-v0.1.8.json',SOURCE/'packaging'/'release-dependencies-v0.1.8.json')
+    add(Path('packaging')/manifest_name,SOURCE/'packaging'/manifest_name)
 
     # Render the complete GPL license as the setup dialog, replacing the old
     # local-only test notice which explicitly prohibited public distribution.
@@ -143,7 +179,7 @@ def main():
     rtf=work/'gpl.rtf';rtf.write_text(r'{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}\f0\fs18 '+escape_rtf((SOURCE/'LICENSE').read_text(encoding='utf8'))+'}',encoding='ascii')
 
     wix=ET.Element('{%s}Wix'%NS)
-    package=el(wix,'Package',Name='SusuClash',Manufacturer='SusuClash',Version='0.1.9',UpgradeCode='{D7806B3D-6DD7-4DA6-B640-D96A07185A75}',Scope='perUser')
+    package=el(wix,'Package',Name='SusuClash',Manufacturer='SusuClash',Version=version,UpgradeCode='{D7806B3D-6DD7-4DA6-B640-D96A07185A75}',Scope='perUser')
     ET.SubElement(package,'{%s}WixUI'%UI_NS,{'Id':'WixUI_Minimal'})
     el(package,'WixVariable',Id='WixUILicenseRtf',Value=str(rtf))
     el(package,'MajorUpgrade',Schedule='afterInstallInitialize',DowngradeErrorMessage='A newer version of SusuClash is already installed.')
@@ -171,9 +207,14 @@ def main():
     el(shortcut,'RemoveFolder',Id='RemoveAppMenuFolder',On='uninstall')
     el(shortcut,'RegistryValue',Root='HKCU',Key='Software\\SusuClash',Name='ShortcutInstalled',Type='integer',Value='1',KeyPath='yes')
     components.append('StartMenuShortcut')
+    desktop=el(package,'StandardDirectory',Id='DesktopFolder')
+    desktop_shortcut=el(desktop,'Component',Id='DesktopShortcut',Guid='{9B103E0E-5FA1-48E4-A9C7-E2BF46B8184A}')
+    el(desktop_shortcut,'Shortcut',Id='DesktopAppShortcut',Name='SusuClash',Target='[#'+starter+']',WorkingDirectory='INSTALLFOLDER',Description='SusuClash',Icon='SusuClashIcon',IconIndex='0')
+    el(desktop_shortcut,'RegistryValue',Root='HKCU',Key='Software\\SusuClash',Name='DesktopShortcutInstalled',Type='integer',Value='1',KeyPath='yes')
+    components.append('DesktopShortcut')
     feature=el(package,'Feature',Id='MainFeature',Title='SusuClash',Level='1')
     for cid in components:el(feature,'ComponentRef',Id=cid)
-    wxs=work/'SusuClash-0.1.9.wxs';ET.ElementTree(wix).write(wxs,encoding='utf-8',xml_declaration=True)
+    wxs=work/('SusuClash-'+version+'.wxs');ET.ElementTree(wix).write(wxs,encoding='utf-8',xml_declaration=True)
     subprocess.run(['wix','build','-ext','WixToolset.UI.wixext','-culture','zh-CN','-arch','x64','-dcl','medium','-pdbtype','none',str(wxs),'-out',str(output)],check=True,cwd=str(SOURCE))
     print('MSI',output);print('SHA256',digest(output));print('Files',len(files));print('Build directory',work)
 

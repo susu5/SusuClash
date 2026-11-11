@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { maxConfigBytes } from './config-limits.mjs';
 
-const maxBytes = 5 * 1024 * 1024;
+const maxBytes = maxConfigBytes;
 const uuid = /^[a-f0-9-]{36}$/i;
 
 // Subscription providers may send numeric traffic metadata in this header.
@@ -134,6 +135,13 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
         '配置顶层格式暂不受支持，请使用标准 YAML 配置。', '配置 YAML 格式无效或包含暂不支持的标签。',
         '配置中的 DNS 设置格式无效。', '配置中的保留字段名称格式无效。', '配置包含暂不支持的循环引用。',
         '代理内核无法启动，请检查文件和系统权限。', '配置校验超时，请稍后重试。',
+        '配置文件内容无效。', '配置文件超过 5 MiB。', '配置校验失败，请检查格式和内核支持的协议。',
+        '订阅引用的地理规则分类在本机数据库中不存在，请使用包含该分类的兼容数据库。',
+        '无法加载订阅所需的地理规则数据库，请检查数据库文件是否完整且兼容。',
+        '软件随附的地理规则数据库校验失败，请重新安装软件。',
+        '无法准备本地地理规则数据库，请检查数据目录的权限和可用空间。',
+        '地理规则数据库已被其他进程修改，请重试。',
+        '订阅中的节点加密方式或密钥参数无法通过内核校验，请检查节点配置与内核版本。',
         '订阅包含当前内核不支持的节点协议，请向服务商获取 Clash 格式。', '订阅中的节点缺少必要信息，请向服务商检查配置。',
         '订阅中的线路、策略组或规则无法通过校验，请检查配置。', '订阅中的配置字段与内核格式不匹配，请检查配置。'
       ]);

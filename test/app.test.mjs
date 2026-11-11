@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createMihomo } from '../src/mihomo.mjs';
 import { diagnose } from '../src/diagnostics.mjs';
 import { startServer } from '../src/server.mjs';
+import { createConnectionIdentity } from '../src/connection-identity.mjs';
 
 test('loopback app validates writes and forwards only approved Mihomo actions', async t => {
   const auth = 'fixture-secret';
@@ -124,4 +125,40 @@ test('connections distinguishes an empty Mihomo snapshot from invalid data or an
   assert.equal((await (await get('state')).json()).connections,null);
   value = new Error('fixture unavailable');
   assert.notEqual((await get('connections')).status,200);
+});
+
+test('connection API supplements missing processes and uses the same safe names in state', async t => {
+  let samples = 0;
+  const metadata = { network:'tcp', sourceIP:'127.0.0.1', sourcePort:'51000', host:'example.test', destinationPort:'443' };
+  const item = (id, meta) => ({id,start:'2026-11-11T00:00:00Z',metadata:meta,chains:['DIRECT'],upload:1,download:2});
+  let entries = [
+    item('windows',metadata),
+    item('core',{process:true,processPath:'C:\\Private\\幕布.exe'}),
+    item('unknown',{...metadata,sourcePort:'51001'}), null
+  ];
+  const core = {
+    call:async (_,route) => route === '/connections' ? {connections:entries,downloadTotal:6,uploadTotal:3} : {'mixed-port':7890,mode:'rule'},
+    identity:async()=>({version:'fixture'}), preferences:async()=>({})
+  };
+  const identity = createConnectionIdentity({lookup:async()=>{
+    samples++;
+    return [{address:'127.0.0.1',port:51000,remoteAddress:'127.0.0.1',remotePort:7890,name:'codex.exe'}];
+  }});
+  const app = await startServer({core,connectionIdentity:identity,dailyUpdate:false});
+  t.after(app.close);
+  const get = async name => { const response=await fetch(app.url+'api/'+name); assert.equal(response.status,200); return response.json(); };
+  let result = await get('connections');
+  assert.deepEqual(result.connections.map(c=>[c.app,c.processSource]),[['codex.exe','windows'],['幕布.exe','core'],['未知应用','unknown']]);
+  assert.equal(samples,1);
+  assert.doesNotMatch(JSON.stringify(result),/Private|sourceIP|sourcePort|processPath/);
+  let state = await get('state');
+  assert(state.connections.apps.some(c=>c.name==='codex.exe'));
+  assert(state.connections.apps.some(c=>c.name==='幕布.exe'));
+  assert.equal(samples,1,'state polling must not spawn native queries');
+  entries = [item('new-id',metadata)];
+  state = await get('state');
+  assert.deepEqual(state.connections.apps.map(c=>c.name),['未知应用'],'a new connection must not inherit a previous port owner');
+  result = await get('connections');
+  assert.equal(result.connections[0].app,'codex.exe');
+  assert.equal(samples,2);
 });

@@ -22,6 +22,8 @@ test('native WebView2 host loads isolated page and handles allowed window messag
       const result=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve({code,signal}));});
       assert.deepEqual(result,{code:0,signal:null});
     }
+    const [bx,by,bw,bh,cw,ch]=(await readFile(path.join(profile,'webview-bounds.txt'),'utf8')).split(',').map(Number);
+    assert.deepEqual([bx,by,bw,bh],[0,0,cw,ch],'WebView content must cover the complete native client, including all four edges');
     assert(requests>=2,'synthetic page loaded on first open and reopening');
     const [left,top,right,bottom,clientX,clientY,clientWidth,clientHeight]=(await readFile(path.join(profile,'window-metrics.txt'),'utf8')).split(',').map(Number);
     assert.equal(clientX,left,'window must not have a native left frame');

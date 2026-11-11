@@ -53,7 +53,9 @@ export function createSystemProxy({ directory, adapter = windowsProxyAdapter() }
   }
   async function status() {
     const [actual, record] = await Promise.all([adapter.read(), getRecord()]);
-    return { enabled: actual.enable.present && actual.enable.value === 1, managed: Boolean(record && isSame(actual, record.applied)), externalChanged: Boolean(record && !isSame(actual, record.applied)), recoveryAvailable: Boolean(record) };
+    const managed=Boolean(record && isSame(actual, record.applied));
+    const port=managed?Number(/^127\.0\.0\.1:(\d+)$/.exec(actual.server.value)?.[1])||null:null;
+    return { enabled: actual.enable.present && actual.enable.value === 1, managed, port, externalChanged: Boolean(record && !isSame(actual, record.applied)), recoveryAvailable: Boolean(record) };
   }
   async function restore() {
     const record = await getRecord();

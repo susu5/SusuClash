@@ -20,6 +20,7 @@ node_modules/
 outputs/
 /runtime/*
 !/runtime/README.md
+!/runtime/geodata.json
 profiles/
 subscriptions/
 logs/

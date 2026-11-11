@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -41,10 +42,16 @@ internal sealed class SusuWindow : Form
         Text = "SusuClash";
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(466, 850);
-        MinimumSize = new Size(360, 600);
-        BackColor = ColorTranslator.FromHtml("#f3eaf0");
-        Padding = new Padding(5);
+        Size = new Size(466, 850);
+        // Minimum dimensions are CSS/logical pixels, including under Windows scaling.
+        using (var graphics = Graphics.FromHwnd(IntPtr.Zero)) {
+            double scale = graphics.DpiX / 96.0;
+            MinimumSize = new Size((int)Math.Ceiling(360 * scale), (int)Math.Ceiling(600 * scale));
+        }
+        BackColor = ColorTranslator.FromHtml("#f7f1f6");
+        Padding = Padding.Empty;
+        browser.Margin = Padding.Empty;
+        browser.DefaultBackgroundColor = BackColor;
         KeyPreview = true;
         try { Icon = new Icon(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "app", "icon.ico")); } catch { }
         browser.Dock = DockStyle.Fill;
@@ -64,35 +71,11 @@ internal sealed class SusuWindow : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        try { int noCorners = 1; DwmSetWindowAttribute(Handle, 33, ref noCorners, sizeof(int)); } catch { }
-        // Windows 11 can add its own light-colored border to a custom frame.
-        // The resizing hit area below remains part of our client area.
-        try { int noBorder = unchecked((int)0xfffffffe); DwmSetWindowAttribute(Handle, 34, ref noBorder, sizeof(int)); } catch { }
-    }
-    protected override void OnPaintBackground(PaintEventArgs e)
-    {
-        base.OnPaintBackground(e);
-        // Paint the resize gutter explicitly: it must blend into the active
-        // theme rather than exposing the default light native window surface.
-        using (var brush = new SolidBrush(BackColor)) {
-            int left = browser.Left, top = browser.Top;
-            int right = browser.Right, bottom = browser.Bottom;
-            e.Graphics.FillRectangle(brush, 0, 0, ClientSize.Width, Math.Max(0, top));
-            e.Graphics.FillRectangle(brush, 0, bottom, ClientSize.Width, Math.Max(0, ClientSize.Height - bottom));
-            e.Graphics.FillRectangle(brush, 0, top, Math.Max(0, left), Math.Max(0, bottom - top));
-            e.Graphics.FillRectangle(brush, right, top, Math.Max(0, ClientSize.Width - right), Math.Max(0, bottom - top));
-        }
-    }
-    private void ApplyThemeColor(string color)
-    {
-        BackColor = ColorTranslator.FromHtml(color);
-        Invalidate();
-    }
-    private int ResizeHitAt(int x, int y)
-    {
-        var p = PointToScreen(new Point(x, y));
-        int coordinates = unchecked((p.Y << 16) | (p.X & 0xffff));
-        return (int)SendMessage(Handle, WM_NCHITTEST, IntPtr.Zero, (IntPtr)coordinates);
+        try {
+            int noCorners = 1, noBorder = unchecked((int)0xFFFFFFFE);
+            DwmSetWindowAttribute(Handle, 33, ref noCorners, sizeof(int));
+            DwmSetWindowAttribute(Handle, 34, ref noBorder, sizeof(int));
+        } catch { }
     }
     protected override void WndProc(ref Message m)
     {
@@ -181,6 +164,22 @@ internal sealed class SusuWindow : Form
             if (Location != before) lastTitleDown = 0;
         }
     }
+    private async Task CaptureTestViews()
+    {
+        // Only reachable in the isolated --test harness; captures the actual WebView.
+        foreach (var size in new[] {new Size(466,850),MinimumSize}) {
+            Size = size;
+            foreach (var theme in new[] {"cat","fish","whale"}) {
+                await browser.CoreWebView2.ExecuteScriptAsync("document.documentElement.dataset.theme='" + theme + "';window.dispatchEvent(new Event('clash-theme-change'));document.getElementById('nodeName').textContent='美国08-0.1倍 | 电信联通移动推荐 — 长线路名称测试';");
+                await Task.Delay(500);
+                if (browser.Bounds != ClientRectangle) throw new Exception("Native WebView edge mismatch: " + browser.Bounds + " / " + ClientRectangle + " padding " + Padding);
+                string name = "native-" + theme + "-" + size.Width + "x" + size.Height;
+                using (var stream = File.Create(Path.Combine(profile,name+".png"))) await browser.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream);
+                string metrics = await browser.CoreWebView2.ExecuteScriptAsync("(()=>{const m=document.querySelector('main'),h=document.querySelector('.doctor-home .section-link'),n=document.getElementById('nodeName');return {width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scrollHeight:m.scrollHeight,clientHeight:m.clientHeight,historyBottom:h.getBoundingClientRect().bottom,mainBottom:m.getBoundingClientRect().bottom,font:getComputedStyle(n).fontSize,badges:document.querySelectorAll('.doctor-home .orb-badge').length}})()");
+                File.WriteAllText(Path.Combine(profile,name+".json"),metrics);
+            }
+        }
+    }
     private async Task StartBrowser()
     {
         try {
@@ -205,38 +204,48 @@ internal sealed class SusuWindow : Form
             core.WebMessageReceived += delegate(object sender, CoreWebView2WebMessageReceivedEventArgs e) {
                 if (!IsLocal(e.Source)) return;
                 string message; try { message = e.TryGetWebMessageAsString(); } catch { return; }
+                if (message.StartsWith("window:resize:")) {
+                    int hit;
+                    if (WindowState == FormWindowState.Normal && Int32.TryParse(message.Substring(14), out hit) && hit >= HTLEFT && hit <= HTBOTTOMRIGHT && !testMode) {
+                        ReleaseCapture(); SendMessage(Handle, 0x112, (IntPtr)(0xF000 + hit - HTLEFT + 1), IntPtr.Zero);
+                    }
+                    return;
+                }
                 switch (message) {
                     case "window:minimize": WindowState = FormWindowState.Minimized; break;
                     case "window:maximize": ToggleMaximize(); break;
                     case "window:close": Close(); break;
                     case "window:drag": HandleTitleDown(); break;
                     case "window:restore-drag": RestoreAndDrag(); break;
-                    case "theme:cat": ApplyThemeColor("#f3eaf0"); break;
-                    case "theme:fish": ApplyThemeColor("#dcf0e5"); break;
-                    case "theme:whale": ApplyThemeColor("#192641"); break;
+                    case "theme:cat": BackColor = browser.DefaultBackgroundColor = ColorTranslator.FromHtml("#f7f1f6"); break;
+                    case "theme:fish": BackColor = browser.DefaultBackgroundColor = ColorTranslator.FromHtml("#e5f3eb"); break;
+                    case "theme:whale": BackColor = browser.DefaultBackgroundColor = ColorTranslator.FromHtml("#1f2e4b"); break;
                 }
             };
             core.NavigationCompleted += async delegate(object sender, CoreWebView2NavigationCompletedEventArgs e) {
                 if (!e.IsSuccess) { exitCode = testMode ? 1 : 11; if (!testMode) MessageBox.Show("无法加载 SusuClash 页面，请重试。", "SusuClash"); Close(); return; }
                 SendState();
+                double contentScale;
+                if (Double.TryParse(await core.ExecuteScriptAsync("window.devicePixelRatio"), NumberStyles.Float, CultureInfo.InvariantCulture, out contentScale) && contentScale >= 1 && contentScale <= 4) {
+                    MinimumSize = new Size((int)Math.Ceiling(360 * contentScale), (int)Math.Ceiling(600 * contentScale));
+                }
                 if (testMode) {
                     try {
+                        if (Environment.GetEnvironmentVariable("SUSU_TEST_RENDER") == "1") {
+                            await Task.Delay(2500);
+                            await CaptureTestViews();
+                            Close(); return;
+                        }
                         NativeRect win, client; var origin = Point.Empty;
                         if (!IsWindowVisible(Handle)) throw new Exception();
                         if (!GetWindowRect(Handle, out win) || !GetClientRect(Handle, out client) || !ClientToScreen(Handle, ref origin)) throw new Exception();
+                        if (browser.Bounds != ClientRectangle) throw new Exception("WebView must fill the client rectangle without a rim");
+                        File.WriteAllText(Path.Combine(profile, "webview-bounds.txt"), String.Join(",", new[] {browser.Left,browser.Top,browser.Width,browser.Height,ClientSize.Width,ClientSize.Height}));
                         File.WriteAllText(Path.Combine(profile, "window-metrics.txt"), String.Join(",", new[] {win.Left,win.Top,win.Right,win.Bottom,origin.X,origin.Y,client.Right,client.Bottom}));
                         if (!AllowedExternal("https://susu5.cn/") || !AllowedExternal("https://github.com/susu5") || !AllowedExternal("https://github.com/susu5/SusuClash/releases") || AllowedExternal("https://github.com/susu5/SusuClash/releases/evil") || AllowedExternal("https://github.com/susu5/SusuClash/releases?token=x") || AllowedExternal("https://susu5.cn.example.test/") || AllowedExternal("http://susu5.cn/") || AllowedExternal("https://github.com/another")) throw new Exception();
-                        string[,] themes = { {"cat", "#f3eaf0"}, {"fish", "#dcf0e5"}, {"whale", "#192641"} };
-                        for (int i = 0; i < themes.GetLength(0); i++) {
-                            await core.ExecuteScriptAsync("window.chrome.webview.postMessage('theme:" + themes[i, 0] + "')");
-                            await Task.Delay(150);
-                            if (BackColor != ColorTranslator.FromHtml(themes[i, 1])) throw new Exception();
-                        }
-                        int w = ClientSize.Width, h = ClientSize.Height;
-                        if (ResizeHitAt(1, h / 2) != HTLEFT || ResizeHitAt(w - 2, h / 2) != HTRIGHT ||
-                            ResizeHitAt(w / 2, 1) != HTTOP || ResizeHitAt(w / 2, h - 2) != HTBOTTOM ||
-                            ResizeHitAt(1, 1) != HTTOPLEFT || ResizeHitAt(w - 2, 1) != HTTOPRIGHT ||
-                            ResizeHitAt(1, h - 2) != HTBOTTOMLEFT || ResizeHitAt(w - 2, h - 2) != HTBOTTOMRIGHT) throw new Exception();
+                        await core.ExecuteScriptAsync("window.chrome.webview.postMessage('theme:whale')");
+                        await Task.Delay(200);
+                        if (BackColor != ColorTranslator.FromHtml("#1f2e4b")) throw new Exception();
                         await core.ExecuteScriptAsync("window.chrome.webview.postMessage('window:maximize')");
                         await Task.Delay(250);
                         if (WindowState != FormWindowState.Maximized) throw new Exception();
@@ -258,7 +267,7 @@ internal sealed class SusuWindow : Form
                         await core.ExecuteScriptAsync("window.chrome.webview.postMessage('window:restore-drag')");
                         await Task.Delay(150);
                         if (WindowState != FormWindowState.Normal) throw new Exception();
-                    } catch { exitCode = 1; }
+                    } catch (Exception error) { File.WriteAllText(Path.Combine(profile,"test-error.txt"),error.ToString()); exitCode = 1; }
                     Close();
                 }
             };

@@ -288,7 +288,7 @@ document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click'
 $('lineSort').addEventListener('change',renderLines);
 $('nodes').addEventListener('click',e=>{const b=e.target.closest('[data-member]'),g=currentGroup();if(!b||!g||b.dataset.member===g.current)return;action('正在切换线路…',async()=>{await api('select',{group:g.name,member:b.dataset.member});ui.diagnosis=null;await refreshGroups();notify('线路已切换');}).catch(()=>{});});
 $('ping').addEventListener('click',()=>{const g=currentGroup();if(!g)return;action('正在测速…',async()=>{const queue=[...g.members]; let done=0; async function worker(){for(;;){const m=queue.shift();if(!m)return;try{const r=await api('delay',{group:g.name,member:m.name});m.delay=r.delay;ui.failures.delete(g.name+'\0'+m.name);}catch{m.delay=null;ui.failures.add(g.name+'\0'+m.name);}set('lineStatus','测速 '+(++done)+' / '+g.members.length);renderLines();}} await Promise.all(Array.from({length:Math.min(4,queue.length)},worker));notify('测速完成');}).catch(()=>{});});
-$('statusOrb').addEventListener('click',()=>openPage('check')); $('runCheck').addEventListener('click',runCheck);
+$('statusOrb').addEventListener('click',()=>window.connectionDoctor?.open()); $('runCheck').addEventListener('click',runCheck);
 $('connectionSearch').addEventListener('input',renderConnections);
 $('connectionList').addEventListener('click',e=>{if(e.target.closest('[data-retry-connections]')){void refreshConnections();return;}const b=e.target.closest('[data-app]');if(b){ui.app=b.dataset.app;openPage('connectionApp');}});
 $('connectionAppList').addEventListener('click',e=>{if(e.target.closest('[data-retry-connections]'))void refreshConnections();});

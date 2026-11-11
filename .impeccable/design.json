@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T00:00:00Z",
+  "title": "Design System: SusuClash",
+  "extensions": {
+    "approval": {
+      "version": "author-v3",
+      "status": "approved",
+      "approvedOn": "2026-11-10",
+      "sourceReference": "design/reference/author-about-approved-v3.png",
+      "referenceImage": "design/reference/author-about-approved-v3.png",
+      "decisions": {
+        "smallText": "12px",
+        "cardRadius": "18px",
+        "otherStyle": "保持选定作者介绍版本风格",
+        "homeLayout": "2026-11-10 用户要求：首页主圆放大、减少顶部留白；三个操作按钮放大并下移；首页移除最近的连接检查入口，历史仍在诊断流程内查看。"
+      },
+      "contractSha256": "9b8772bda5561c60d30027bd131c2531674f70bd49e58621446f1eb297fd4a13"
+    },
+    "colorMeta": {
+      "cat-window": {
+        "role": "neutral",
+        "displayName": "cat-window",
+        "tonalRamp": [
+          "oklch(0.150 0.00656 5.63)",
+          "oklch(0.264 0.00656 5.63)",
+          "oklch(0.379 0.00656 5.63)",
+          "oklch(0.493 0.00656 5.63)",
+          "oklch(0.607 0.00656 5.63)",
+          "oklch(0.721 0.00656 5.63)",
+          "oklch(0.836 0.00656 5.63)",
+          "oklch(0.950 0.00656 5.63)"
+        ]
+      },
+      "cat-surface": {
+        "role": "neutral",
+        "displayName": "cat-surface",
+        "tonalRamp": [
+          "oklch(0.150 0.00849 349.25)",
+          "oklch(0.264 0.00849 349.25)",
+          "oklch(0.379 0.00849 349.25)",
+          "oklch(0.493 0.00849 349.25)",
+          "oklch(0.607 0.00849 349.25)",
+          "oklch(0.721 0.00849 349.25)",
+          "oklch(0.836 0.00849 349.25)",
+          "oklch(0.950 0.00849 349.25)"
+        ]
+      },
+      "cat-text": {
+        "role": "neutral",
+        "displayName": "cat-text",
+        "tonalRamp": [
+          "oklch(0.150 0.04047 309.17)",
+          "oklch(0.264 0.04047 309.17)",
+          "oklch(0.379 0.04047 309.17)",
+          "oklch(0.493 0.04047 309.17)",
+          "oklch(0.607 0.04047 309.17)",
+          "oklch(0.721 0.04047 309.17)",
+          "oklch(0.836 0.04047 309.17)",
+          "oklch(0.950 0.04047 309.17)"
+        ]
+      },
+      "cat-muted": {
+        "role": "neutral",
+        "displayName": "cat-muted",
+        "tonalRamp": [
+          "oklch(0.150 0.03060 320.28)",
+          "oklch(0.264 0.03060 320.28)",
+          "oklch(0.379 0.03060 320.28)",
+          "oklch(0.493 0.03060 320.28)",
+          "oklch(0.607 0.03060 320.28)",
+          "oklch(0.721 0.03060 320.28)",
+          "oklch(0.836 0.03060 320.28)",
+          "oklch(0.950 0.03060 320.28)"
+        ]
+      },
+      "cat-accent": {
+        "role": "primary",
+        "displayName": "cat-accent",
+        "tonalRamp": [
+          "oklch(0.150 0.10158 311.24)",
+          "oklch(0.264 0.10158 311.24)",
+          "oklch(0.379 0.10158 311.24)",
+          "oklch(0.493 0.10158 311.24)",
+          "oklch(0.607 0.10158 311.24)",
+          "oklch(0.721 0.10158 311.24)",
+          "oklch(0.836 0.10158 311.24)",
+          "oklch(0.950 0.10158 311.24)"
+        ]
+      },
+      "cat-nav-track": {
+        "role": "neutral",
+        "displayName": "cat-nav-track",
+        "tonalRamp": [
+          "oklch(0.150 0.01342 333.05)",
+          "oklch(0.264 0.01342 333.05)",
+          "oklch(0.379 0.01342 333.05)",
+          "oklch(0.493 0.01342 333.05)",
+          "oklch(0.607 0.01342 333.05)",
+          "oklch(0.721 0.01342 333.05)",
+          "oklch(0.836 0.01342 333.05)",
+          "oklch(0.950 0.01342 333.05)"
+        ]
+      },
+      "cat-nav-selected": {
+        "role": "neutral",
+        "displayName": "cat-nav-selected",
+        "tonalRamp": [
+          "oklch(0.150 0.00578 333.98)",
+          "oklch(0.264 0.00578 333.98)",
+          "oklch(0.379 0.00578 333.98)",
+          "oklch(0.493 0.00578 333.98)",
+          "oklch(0.607 0.00578 333.98)",
+          "oklch(0.721 0.00578 333.98)",
+          "oklch(0.836 0.00578 333.98)",
+          "oklch(0.950 0.00578 333.98)"
+        ]
+      },
+      "fish-window": {
+        "role": "neutral",
+        "displayName": "fish-window",
+        "tonalRamp": [
+          "oklch(0.150 0.01817 161.12)",
+          "oklch(0.264 0.01817 161.12)",
+          "oklch(0.379 0.01817 161.12)",
+          "oklch(0.493 0.01817 161.12)",
+          "oklch(0.607 0.01817 161.12)",
+          "oklch(0.721 0.01817 161.12)",
+          "oklch(0.836 0.01817 161.12)",
+          "oklch(0.950 0.01817 161.12)"
+        ]
+      },
+      "fish-surface": {
+        "role": "neutral",
+        "displayName": "fish-surface",
+        "tonalRamp": [
+          "oklch(0.150 0.02613 169.28)",
+          "oklch(0.264 0.02613 169.28)",
+          "oklch(0.379 0.02613 169.28)",
+          "oklch(0.493 0.02613 169.28)",
+          "oklch(0.607 0.02613 169.28)",
+          "oklch(0.721 0.02613 169.28)",
+          "oklch(0.836 0.02613 169.28)",
+          "oklch(0.950 0.02613 169.28)"
+        ]
+      },
+      "fish-text": {
+        "role": "neutral",
+        "displayName": "fish-text",
+        "tonalRamp": [
+          "oklch(0.150 0.06071 177.34)",
+          "oklch(0.264 0.06071 177.34)",
+          "oklch(0.379 0.06071 177.34)",
+          "oklch(0.493 0.06071 177.34)",
+          "oklch(0.607 0.06071 177.34)",
+          "oklch(0.721 0.06071 177.34)",
+          "oklch(0.836 0.06071 177.34)",
+          "oklch(0.950 0.06071 177.34)"
+        ]
+      },
+      "fish-muted": {
+        "role": "neutral",
+        "displayName": "fish-muted",
+        "tonalRamp": [
+          "oklch(0.150 0.06017 175.12)",
+          "oklch(0.264 0.06017 175.12)",
+          "oklch(0.379 0.06017 175.12)",
+          "oklch(0.493 0.06017 175.12)",
+          "oklch(0.607 0.06017 175.12)",
+          "oklch(0.721 0.06017 175.12)",
+          "oklch(0.836 0.06017 175.12)",
+          "oklch(0.950 0.06017 175.12)"
+        ]
+      },
+      "fish-accent": {
+        "role": "primary",
+        "displayName": "fish-accent",
+        "tonalRamp": [
+          "oklch(0.150 0.10369 174.62)",
+          "oklch(0.264 0.10369 174.62)",
+          "oklch(0.379 0.10369 174.62)",
+          "oklch(0.493 0.10369 174.62)",
+          "oklch(0.607 0.10369 174.62)",
+          "oklch(0.721 0.10369 174.62)",
+          "oklch(0.836 0.10369 174.62)",
+          "oklch(0.950 0.10369 174.62)"
+        ]
+      },
+      "fish-nav-track": {
+        "role": "neutral",
+        "displayName": "fish-nav-track",
+        "tonalRamp": [
+          "oklch(0.150 0.03431 165.97)",
+          "oklch(0.264 0.03431 165.97)",
+          "oklch(0.379 0.03431 165.97)",
+          "oklch(0.493 0.03431 165.97)",
+          "oklch(0.607 0.03431 165.97)",
+          "oklch(0.721 0.03431 165.97)",
+          "oklch(0.836 0.03431 165.97)",
+          "oklch(0.950 0.03431 165.97)"
+        ]
+      },
+      "fish-nav-selected": {
+        "role": "neutral",
+        "displayName": "fish-nav-selected",
+        "tonalRamp": [
+          "oklch(0.150 0.02065 152.20)",
+          "oklch(0.264 0.02065 152.20)",
+          "oklch(0.379 0.02065 152.20)",
+          "oklch(0.493 0.02065 152.20)",
+          "oklch(0.607 0.02065 152.20)",
+          "oklch(0.721 0.02065 152.20)",
+          "oklch(0.836 0.02065 152.20)",
+          "oklch(0.950 0.02065 152.20)"
+        ]
+      },
+      "whale-window": {
+        "role": "neutral",
+        "displayName": "whale-window",
+        "tonalRamp": [
+          "oklch(0.150 0.05729 267.51)",
+          "oklch(0.264 0.05729 267.51)",
+          "oklch(0.379 0.05729 267.51)",
+          "oklch(0.493 0.05729 267.51)",
+          "oklch(0.607 0.05729 267.51)",
+          "oklch(0.721 0.05729 267.51)",
+          "oklch(0.836 0.05729 267.51)",
+          "oklch(0.950 0.05729 267.51)"
+        ]
+      },
+      "whale-surface": {
+        "role": "neutral",
+        "displayName": "whale-surface",
+        "tonalRamp": [
+          "oklch(0.150 0.05513 264.25)",
+          "oklch(0.264 0.05513 264.25)",
+          "oklch(0.379 0.05513 264.25)",
+          "oklch(0.493 0.05513 264.25)",
+          "oklch(0.607 0.05513 264.25)",
+          "oklch(0.721 0.05513 264.25)",
+          "oklch(0.836 0.05513 264.25)",
+          "oklch(0.950 0.05513 264.25)"
+        ]
+      },
+      "whale-text": {
+        "role": "neutral",
+        "displayName": "whale-text",
+        "tonalRamp": [
+          "oklch(0.150 0.02379 270.34)",
+          "oklch(0.264 0.02379 270.34)",
+          "oklch(0.379 0.02379 270.34)",
+          "oklch(0.493 0.02379 270.34)",
+          "oklch(0.607 0.02379 270.34)",
+          "oklch(0.721 0.02379 270.34)",
+          "oklch(0.836 0.02379 270.34)",
+          "oklch(0.950 0.02379 270.34)"
+        ]
+      },
+      "whale-muted": {
+        "role": "neutral",
+        "displayName": "whale-muted",
+        "tonalRamp": [
+          "oklch(0.150 0.04548 265.52)",
+          "oklch(0.264 0.04548 265.52)",
+          "oklch(0.379 0.04548 265.52)",
+          "oklch(0.493 0.04548 265.52)",
+          "oklch(0.607 0.04548 265.52)",
+          "oklch(0.721 0.04548 265.52)",
+          "oklch(0.836 0.04548 265.52)",
+          "oklch(0.950 0.04548 265.52)"
+        ]
+      },
+      "whale-accent": {
+        "role": "primary",
+        "displayName": "whale-accent",
+        "tonalRamp": [
+          "oklch(0.150 0.12756 273.13)",
+          "oklch(0.264 0.12756 273.13)",
+          "oklch(0.379 0.12756 273.13)",
+          "oklch(0.493 0.12756 273.13)",
+          "oklch(0.607 0.12756 273.13)",
+          "oklch(0.721 0.12756 273.13)",
+          "oklch(0.836 0.12756 273.13)",
+          "oklch(0.950 0.12756 273.13)"
+        ]
+      },
+      "whale-nav-track": {
+        "role": "neutral",
+        "displayName": "whale-nav-track",
+        "tonalRamp": [
+          "oklch(0.150 0.04860 262.27)",
+          "oklch(0.264 0.04860 262.27)",
+          "oklch(0.379 0.04860 262.27)",
+          "oklch(0.493 0.04860 262.27)",
+          "oklch(0.607 0.04860 262.27)",
+          "oklch(0.721 0.04860 262.27)",
+          "oklch(0.836 0.04860 262.27)",
+          "oklch(0.950 0.04860 262.27)"
+        ]
+      },
+      "whale-nav-selected": {
+        "role": "neutral",
+        "displayName": "whale-nav-selected",
+        "tonalRamp": [
+          "oklch(0.150 0.09424 263.19)",
+          "oklch(0.264 0.09424 263.19)",
+          "oklch(0.379 0.09424 263.19)",
+          "oklch(0.493 0.09424 263.19)",
+          "oklch(0.607 0.09424 263.19)",
+          "oklch(0.721 0.09424 263.19)",
+          "oklch(0.836 0.09424 263.19)",
+          "oklch(0.950 0.09424 263.19)"
+        ]
+      },
+      "cat-nav-text": {
+        "role": "neutral",
+        "displayName": "cat 导航普通文字"
+      },
+      "cat-nav-accent": {
+        "role": "primary",
+        "displayName": "cat 导航选中文字"
+      },
+      "fish-nav-text": {
+        "role": "neutral",
+        "displayName": "fish 导航普通文字"
+      },
+      "fish-nav-accent": {
+        "role": "primary",
+        "displayName": "fish 导航选中文字"
+      },
+      "whale-nav-text": {
+        "role": "neutral",
+        "displayName": "whale 导航普通文字"
+      },
+      "whale-nav-accent": {
+        "role": "primary",
+        "displayName": "whale 导航选中文字"
+      }
+    },
+    "typographyMeta": {
+      "page-title": {
+        "displayName": "page-title",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "dialog-title": {
+        "displayName": "dialog-title",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "author-name": {
+        "displayName": "author-name",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "section-title": {
+        "displayName": "section-title",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "body": {
+        "displayName": "body",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "control": {
+        "displayName": "control",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "caption": {
+        "displayName": "caption",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "nav-label": {
+        "displayName": "nav-label",
+        "purpose": "参照DESIGN.md对应文字角色"
+      },
+      "field-label": {
+        "displayName": "field-label",
+        "purpose": "参照DESIGN.md对应文字角色"
+      }
+    },
+    "shadows": [
+      {
+        "name": "cat-raised",
+        "value": "4px 5px 10px #a995a92e,-4px -4px 9px #fffdfcd9",
+        "purpose": "卡片和按钮凸起"
+      },
+      {
+        "name": "cat-inset",
+        "value": "inset 3px 3px 8px #b6a5b83d,inset -3px -3px 8px #ffffffc9",
+        "purpose": "内凹与按压"
+      },
+      {
+        "name": "cat-nav-inset",
+        "value": "inset 3px 4px 9px #bfb0bd66,inset -3px -3px 9px #fffdfce0",
+        "purpose": "原稿导航轨道"
+      },
+      {
+        "name": "cat-nav-raised",
+        "value": "4px 4px 10px #bfb0bd66,-3px -3px 8px #fffdfce0",
+        "purpose": "原稿导航选中滑块"
+      },
+      {
+        "name": "fish-raised",
+        "value": "4px 5px 10px #76ad9944,-4px -4px 9px #f4fff7d9",
+        "purpose": "卡片和按钮凸起"
+      },
+      {
+        "name": "fish-inset",
+        "value": "inset 3px 3px 8px #82af9e55,inset -3px -3px 8px #f3fff5d9",
+        "purpose": "内凹与按压"
+      },
+      {
+        "name": "fish-nav-inset",
+        "value": "inset 3px 4px 9px #8db6a477,inset -3px -3px 9px #f5fff8e8",
+        "purpose": "原稿导航轨道"
+      },
+      {
+        "name": "fish-nav-raised",
+        "value": "4px 4px 10px #8db6a477,-3px -3px 8px #f5fff8e8",
+        "purpose": "原稿导航选中滑块"
+      },
+      {
+        "name": "whale-raised",
+        "value": "4px 5px 10px #080f22a0,-3px -3px 8px #2b3d5c80",
+        "purpose": "卡片和按钮凸起"
+      },
+      {
+        "name": "whale-inset",
+        "value": "inset 3px 3px 8px #080f22aa,inset -3px -3px 8px #31426377",
+        "purpose": "内凹与按压"
+      },
+      {
+        "name": "whale-nav-inset",
+        "value": "inset 3px 4px 9px #030917c9,inset -3px -3px 9px #40547755",
+        "purpose": "原稿导航轨道"
+      },
+      {
+        "name": "whale-nav-raised",
+        "value": "4px 4px 10px #030917c9,-3px -3px 8px #40547755",
+        "purpose": "原稿导航选中滑块"
+      }
+    ],
+    "motion": [
+      {
+        "name": "sheet-duration",
+        "value": "240ms",
+        "purpose": "保留底部弹层进出节奏"
+      },
+      {
+        "name": "sheet-easing",
+        "value": "ease",
+        "purpose": "选定原稿底部弹层原有缓动"
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation:none!important;transition:none!important",
+        "purpose": "减少非必要运动"
+      }
+    ],
+    "geometry": {
+      "titlebar-height": "49px",
+      "nav-height": "62px",
+      "nav-icon-size": "18px",
+      "titlebar-icon-size": "13px",
+      "contact-row-min-height": "74px",
+      "contact-icon-size": "34px",
+      "author-mark-size": "56px",
+      "home-orb-max-size": "280px",
+      "home-orb-min-size": "136px",
+      "home-orb-compact-size": "128px",
+      "home-orb-height-reserve": "374px",
+      "home-orb-top-gap": "32px",
+      "home-action-size": "60px",
+      "home-action-compact-size": "56px",
+      "home-action-small-size": "52px",
+      "home-action-icon-size": "26px",
+      "home-action-top-gap": "40px"
+    },
+    "assets": [
+      "app/icon.svg",
+      "app/cat-poster.png",
+      "app/cat-motion.gif",
+      "app/fish-poster.png",
+      "app/fish-motion.gif",
+      "app/whale-poster.png",
+      "app/whale-motion.gif"
+    ]
+  },
+  "components": [
+    {
+      "name": "通用卡片",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "全项目卡片18px圆角；内容14px，小字12px。",
+      "html": "<section class=\"ds-panel\"><strong>信息卡片</strong><p>统一的材料和层级</p></section>",
+      "css": ".ds-panel{font-family:\"Segoe UI\",\"Microsoft YaHei UI\",\"Microsoft YaHei\",sans-serif;font-size:14px;line-height:1.5;background:var(--sc-color-surface,#F4EDF0);color:var(--sc-color-text,#42364C);border-radius:var(--sc-radius-panel,18px);padding:18px;box-shadow:var(--sc-shadow-raised,4px 5px 10px #a995a92e,-4px -4px 9px #fffdfcd9);}.ds-panel p{font-size:12px;color:var(--sc-color-muted,#817384)}"
+    },
+    {
+      "name": "作者卡片",
+      "kind": "card",
+      "refersTo": "author-panel",
+      "description": "与通用卡片共享18px圆角，不保留19px例外。",
+      "html": "<section class=\"ds-author\"><span class=\"ds-author-mark\">s</span><div><small>作者</small><strong>susu5</strong><p>SusuClash</p></div></section>",
+      "css": ".ds-author{font-family:\"Segoe UI\",\"Microsoft YaHei UI\",\"Microsoft YaHei\",sans-serif;font-size:14px;line-height:1.5;background:var(--sc-color-surface,#F4EDF0);color:var(--sc-color-text,#42364C);border-radius:var(--sc-radius-panel,18px);padding:18px;box-shadow:var(--sc-shadow-raised,4px 5px 10px #a995a92e,-4px -4px 9px #fffdfcd9);}.ds-author strong{font-size:21px}.ds-author p{font-size:12px;color:var(--sc-color-muted,#817384)} .ds-author{display:flex;align-items:center;gap:15px}.ds-author-mark{display:grid;place-items:center;flex:none;width:56px;height:56px;border-radius:18px;background:var(--sc-color-surface,#F4EDF0);color:var(--sc-color-accent,#9973B2);font-size:24px;box-shadow:var(--sc-shadow-inset,inset 3px 3px 8px #b6a5b83d,inset -3px -3px 8px #ffffffc9)}.ds-author small{font-size:12px;color:var(--sc-color-muted,#817384)}.ds-author strong{display:block}"
+    },
+    {
+      "name": "复制按钮",
+      "kind": "button",
+      "refersTo": "contact-copy",
+      "description": "12px文字；8×12px内边距；10px按钮圆角。",
+      "html": "<button class=\"ds-copy\">复制</button>",
+      "css": ".ds-copy{font-family:\"Segoe UI\",\"Microsoft YaHei UI\",\"Microsoft YaHei\",sans-serif;font-size:12px;line-height:1.5;font-weight:650;border:0;border-radius:10px;padding:8px 12px;background:var(--sc-color-surface,#F4EDF0);color:var(--sc-color-accent,#9973B2);box-shadow:var(--sc-shadow-raised,4px 5px 10px #a995a92e,-4px -4px 9px #fffdfcd9);cursor:pointer}.ds-copy:hover{color:var(--sc-color-text,#42364C)}.ds-copy:active{box-shadow:var(--sc-shadow-inset,inset 3px 3px 8px #b6a5b83d,inset -3px -3px 8px #ffffffc9)}.ds-copy:disabled{opacity:.5;box-shadow:none}.ds-copy:focus-visible,.ds-window:focus-visible,.ds-nav button:focus-visible{outline:2px solid var(--sc-color-accent,#9973B2);outline-offset:2px}"
+    },
+    {
+      "name": "四项导航",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "保持62px轨道和17px圆角；全部导航文字12px。",
+      "html": "<nav class=\"ds-nav\"><button>首页</button><button>线路</button><button>连接</button><button aria-current=\"page\">设置</button></nav>",
+      "css": ".ds-nav{display:grid;grid-template-columns:repeat(4,1fr);height:62px;padding:5px;border-radius:17px;background:var(--sc-color-nav-track,#EEE5EC);box-sizing:border-box}.ds-nav button{font-family:\"Segoe UI\",\"Microsoft YaHei UI\",\"Microsoft YaHei\",sans-serif;font-size:12px;border:0;border-radius:12px;background:transparent;color:var(--sc-color-nav-text,#85758B)}.ds-nav button[aria-current]{background:var(--sc-color-nav-selected,#FBF7FA);color:var(--sc-color-nav-accent,#956CB0);font-weight:700}.ds-nav button:hover{color:var(--sc-color-text,#42364C)}.ds-nav button:active{box-shadow:var(--sc-shadow-inset,inset 3px 3px 8px #b6a5b83d,inset -3px -3px 8px #ffffffc9)}.ds-copy:focus-visible,.ds-window:focus-visible,.ds-nav button:focus-visible{outline:2px solid var(--sc-color-accent,#9973B2);outline-offset:2px}"
+    },
+    {
+      "name": "窗口控制",
+      "kind": "button",
+      "refersTo": "window-control",
+      "description": "保留33×30px控制按钮和9px圆角，区别于卡片。",
+      "html": "<button class=\"ds-window\" aria-label=\"最小化\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\"><path d=\"M3 9h10\"/></svg></button>",
+      "css": ".ds-window{font-family:\"Segoe UI\",\"Microsoft YaHei UI\",\"Microsoft YaHei\",sans-serif;font-size:12px;line-height:1.5;font-weight:650;border:0;border-radius:10px;padding:8px 12px;background:var(--sc-color-surface,#F4EDF0);color:var(--sc-color-accent,#9973B2);box-shadow:var(--sc-shadow-raised,4px 5px 10px #a995a92e,-4px -4px 9px #fffdfcd9);cursor:pointer;width:33px;height:30px;padding:0;border-radius:9px}.ds-window:hover{color:var(--sc-color-text,#42364C)}.ds-window:active{box-shadow:var(--sc-shadow-inset,inset 3px 3px 8px #b6a5b83d,inset -3px -3px 8px #ffffffc9)}.ds-copy:focus-visible,.ds-window:focus-visible,.ds-nav button:focus-visible{outline:2px solid var(--sc-color-accent,#9973B2);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "三主题柔和拟物客户端",
+    "overview": "固定风格：三主题、柔和拟物、直角外窗、圆角内层、真实动物视觉。后续新增页面与版本更新必须保持同一套视觉系统。",
+    "keyCharacteristics": [
+      "全部小字12px",
+      "全部卡片18px圆角",
+      "其余保持选定版本风格"
+    ],
+    "rules": [
+      {
+        "name": "小字统一",
+        "body": "字段标签、辅助说明、导航、脚注和操作提示全部12px，不得低于12px。",
+        "section": "typography"
+      },
+      {
+        "name": "卡片统一",
+        "body": "全部卡片统一18px，按钮、导航、弹层和圆形控件保留各自形状角色。",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "复用共享变量和组件。",
+      "同一修改覆盖三主题。",
+      "版本更新前检查规范和真实界面。"
+    ],
+    "donts": [
+      "禁止功能更新夹带换肤。",
+      "禁止私自修改已确认变量或重写批准摘要绕过检查。"
+    ]
+  }
+}

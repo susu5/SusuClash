@@ -1,3 +1,3 @@
-# 本地运行资源（不随源码仓库发布）
+# 运行依赖
 
-此目录中的依赖二进制和规则数据需由开发者自行准备。请先阅读根目录 [BUILDING.md](../BUILDING.md) 并核查相关组件的来源和许可证。
+公开源码只保留geodata.json，不包含预编译Node、Mihomo、WebView2宿主或地理数据库。按packaging/release-dependencies-v0.1.20.json和BUILDING.md准备经核验的官方依赖；不要复制或提交真实用户数据。

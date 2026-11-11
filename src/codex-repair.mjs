@@ -50,7 +50,7 @@ function replacePort(content, oldPort, newPort) {
 /** Explicit preview and confirmation only. Never emits environment contents or credentials. */
 export function createCodexRepair({core, directory=process.env.USERPROFILE ? path.join(process.env.USERPROFILE,'.codex') : null, readListeners=listeners, probe=webProbe, copyPermissions=matchFilePermissions, now=()=>Date.now()}={}) {
   let plan = null;
-  async function examine() {
+  async function examine(allowOccupiedOldPort=false) {
     if (!directory || !core || typeof core.applyConfig !== 'function') return {eligible:false, reason:'当前客户端无法确认受控内核，未提供自动修改。'};
     if(!await plainDirectory(directory)) return {eligible:false,reason:'Codex 配置目录无法安全识别，请手动检查。'};
     const target = path.join(directory,'.env'); let content, stat;
@@ -63,21 +63,21 @@ export function createCodexRepair({core, directory=process.env.USERPROFILE ? pat
     if(!Number.isInteger(newPort)||newPort<1||newPort>65535) return {eligible:false,reason:'无法确认当前代理端口。'};
     if(oldPort===newPort) return {eligible:false,reason:'Codex 固定代理端口与当前端口一致；请继续检查应用内连接。'};
     const owners=await readListeners([oldPort,newPort]);
-    if(!owners || owners.some(x=>x.port===oldPort) || !(typeof core.processId==='function' && Number.isInteger(core.processId()) && owners.some(x=>x.port===newPort && Number(x.pid)===core.processId()))) return {eligible:false,reason:'旧端口仍在使用或当前端口未确认；为避免覆盖其他代理，未提供自动修改。'};
+    if(!owners || (!allowOccupiedOldPort && owners.some(x=>x.port===oldPort)) || !(typeof core.processId==='function' && Number.isInteger(core.processId()) && owners.some(x=>x.port===newPort && Number(x.pid)===core.processId()))) return {eligible:false,reason:'旧端口仍在使用或当前端口未确认；为避免覆盖其他代理，未提供自动修改。'};
     const status=await probe(codexTarget,'http://127.0.0.1:'+newPort+'/',{short:true});
     if(!(status>=200&&status<400)) return {eligible:false,reason:'当前代理访问目标站点尚未通过，未提供自动修改。'};
-    return {eligible:true,target,content,oldPort,newPort,hash:digest(content),mode:stat.mode,dev:stat.dev,ino:stat.ino};
+    return {eligible:true,target,content,oldPort,newPort,hash:digest(content),mode:stat.mode,dev:stat.dev,ino:stat.ino,oldOwners:JSON.stringify(owners.filter(x=>x.port===oldPort).map(x=>({pid:x.pid,address:x.address})).sort((a,b)=>String(a.pid).localeCompare(String(b.pid))))};
   }
-  async function preview(){
-    plan=null; const result=await examine(); if(!result.eligible)return result;
-    const token=randomBytes(24).toString('base64url'); plan={...result,token,expires:now()+60000};
-    return {eligible:true,token,oldPort:result.oldPort,newPort:result.newPort,expiresAt:new Date(plan.expires).toISOString(),summary:'备份 Codex 配置，仅将已有本机固定代理端口同步到当前端口。请完全退出并重开 Codex 后，在应用内验证。'};
+  async function preview({allowOccupiedOldPort=false}={}){
+    plan=null; const result=await examine(allowOccupiedOldPort===true); if(!result.eligible)return result;
+    const token=randomBytes(24).toString('base64url'); plan={...result,token,allowOccupiedOldPort:allowOccupiedOldPort===true,expires:now()+60000};
+    return {eligible:true,token,oldPort:result.oldPort,newPort:result.newPort,oldPortOccupied:result.oldOwners!=='[]',expiresAt:new Date(plan.expires).toISOString(),summary:'备份 Codex 配置，仅将已有本机固定代理端口同步到当前端口。请完全退出并重开 Codex 后，在应用内验证。'};
   }
   async function apply(token){
     const saved=plan; plan=null;
     if(!saved||typeof token!=='string'||token!==saved.token||now()>saved.expires) return {ok:false,message:'修复预览已失效，请重新检查。'};
-    const current=await examine();
-    if(!current.eligible||current.hash!==saved.hash||current.oldPort!==saved.oldPort||current.newPort!==saved.newPort||current.dev!==saved.dev||current.ino!==saved.ino) return {ok:false,message:'检测条件或配置已变化，请重新检查；未修改配置。'};
+    const current=await examine(saved.allowOccupiedOldPort);
+    if(!current.eligible||current.hash!==saved.hash||current.oldOwners!==saved.oldOwners||current.oldPort!==saved.oldPort||current.newPort!==saved.newPort||current.dev!==saved.dev||current.ino!==saved.ino) return {ok:false,message:'检测条件或配置已变化，请重新检查；未修改配置。'};
     const backup=path.join(directory,'.env.clash-backup-'+now()+'-'+randomBytes(6).toString('hex'));
     const tmp=path.join(directory,'.env.clash-tmp-'+randomBytes(8).toString('hex'));
     let backupReady=false;

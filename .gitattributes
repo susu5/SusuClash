@@ -1,1 +1,2 @@
-licenses/** -text
+# Preserve reviewed release bytes, including source and packaged assets.
+* -text

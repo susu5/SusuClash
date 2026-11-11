@@ -41,9 +41,11 @@
       "verification": "official GitHub release asset digest; V2Fly config uses DB-IP Lite"
     },
     "geosite.dat": {
-      "sha256": "dc4192dd1b644a38276ed06136d26e729fa674d25785adb38c87e040e92376b2",
-      "source": "https://github.com/v2fly/domain-list-community/releases/download/20261108011013/dlc.dat",
-      "verification": "official GitHub release asset digest; renamed dlc.dat to geosite.dat"
+      "sha256": "85073a00a3c3eb80ac76b97df2f97f7dab00cb36c8b5e7ed2354cbd016f8b088",
+      "source": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
+      "verification": "official GitHub release asset SHA-256; asset 725861463; published 2026-11-09T01:50:54Z",
+      "assetId": 725861463,
+      "bytes": 4355962
     },
     "dbip-country-lite-2026-11.mmdb": {
       "sha256": "145ce5dfb812d8de28547e6289bb5c5f8b3df2f1dea21d324d5b575e0431311f",
@@ -109,6 +111,16 @@
       "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
       "source": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt",
       "verification": "Official Creative Commons license text over HTTPS"
+    },
+    "METACUBEX-GEOSITE-LICENSE": {
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "source": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/4178770badecb1b349fbcd62c737e0d7a2079729/LICENSE",
+      "verification": "GPL-3.0 license pinned to upstream source commit"
+    },
+    "meta-rules-source.tar.gz": {
+      "sha256": "6e8d87b0439cfe46618a55f0d8c90fea07450c59f586d1dab48d920f2e5db0a0",
+      "source": "https://codeload.github.com/MetaCubeX/meta-rules-dat/tar.gz/4178770badecb1b349fbcd62c737e0d7a2079729",
+      "verification": "upstream build source snapshot pinned to 4178770badecb1b349fbcd62c737e0d7a2079729"
     }
   }
 }
