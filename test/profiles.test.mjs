@@ -1,8 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { createProfileStore } from '../src/profiles.mjs';
+import { coreValidationFailure } from '../src/managed-core.mjs';
+
+async function metadataFixture(t, system) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'susu-profile-metadata-'));
+  t.after(async () => { assert.equal(path.dirname(directory).toLowerCase(), path.resolve(os.tmpdir()).toLowerCase()); await rm(directory, {recursive:true,force:true}); });
+  const applied=[];
+  const store=createProfileStore({directory,system,validateConfig:async()=>{},applyConfig:async file=>{applied.push(await readFile(file,'utf8'));},fetchImpl:async()=>{throw Error('No network in metadata fixture');}});
+  return {directory,store,applied,manifest:path.join(directory,'profiles.json')};
+}
+
+test('profile selection retries transient Windows manifest persistence without reapplying the core', {skip:process.platform!=='win32'}, async t=>{
+  let armed=false,attempts=0;
+  const f=await metadataFixture(t,{renameMetadata:async(from,to)=>{assert.equal(path.basename(to),'profiles.json');if(armed&&++attempts<3)throw Object.assign(Error('sharing'),{code:'EPERM'});return rename(from,to);}});
+  const item=await f.store.addLocal({name:'A',content:'valid: a\n'});armed=true;
+  await f.store.activate(item.id);
+  assert.equal(attempts,3);assert.deepEqual(f.applied,['valid: a\n']);assert.equal((await f.store.list()).activeId,item.id);
+});
+
+test('persistent Windows manifest denial restores the previously active runtime and leaves metadata unchanged', {skip:process.platform!=='win32'}, async t=>{
+  let armed=false,attempts=0;
+  const f=await metadataFixture(t,{renameMetadata:async(from,to)=>{if(armed){attempts++;throw Object.assign(Error('denied'),{code:'EACCES'});}return rename(from,to);}});
+  const a=await f.store.addLocal({name:'A',content:'valid: a\n'}),b=await f.store.addLocal({name:'B',content:'valid: b\n'});await f.store.activate(a.id);
+  const before=await readFile(f.manifest);armed=true;await assert.rejects(f.store.activate(b.id),/无法保存当前配置/);
+  assert.equal(attempts,6);assert.deepEqual(await readFile(f.manifest),before);assert.equal((await f.store.list()).activeId,a.id);assert.deepEqual(f.applied,['valid: a\n','valid: b\n','valid: a\n']);
+});
+
+test('a manifest changed after initialization is rejected before applying a cached profile', async t=>{
+  const f=await metadataFixture(t,{}),item=await f.store.addLocal({name:'A',content:'valid: a\n'});
+  const foreign=JSON.parse(await readFile(f.manifest,'utf8'));foreign.profiles[0].name='External';const bytes=Buffer.from(JSON.stringify(foreign));await writeFile(f.manifest,bytes);
+  await assert.rejects(f.store.activate(item.id),error=>error.status===409);assert.deepEqual(f.applied,[]);assert.deepEqual(await readFile(f.manifest),bytes);
+});
+
+test('manifest retry preserves an external replacement and restores the previous running profile', {skip:process.platform!=='win32'}, async t=>{
+  let armed=false,attempts=0,foreign;
+  const f=await metadataFixture(t,{renameMetadata:async(from,to)=>{if(armed){attempts++;const next=JSON.parse(await readFile(to,'utf8'));next.foreign='keep';foreign=Buffer.from(JSON.stringify(next));await writeFile(to,foreign);throw Object.assign(Error('sharing'),{code:'EPERM'});}return rename(from,to);}});
+  const a=await f.store.addLocal({name:'A',content:'valid: a\n'}),b=await f.store.addLocal({name:'B',content:'valid: b\n'});await f.store.activate(a.id);armed=true;
+  await assert.rejects(f.store.activate(b.id),/无法保存当前配置/);assert.equal(attempts,1);assert.deepEqual(await readFile(f.manifest),foreign);assert.deepEqual(f.applied,['valid: a\n','valid: b\n','valid: a\n']);
+});
 
 test('validated import, explicit activation and atomic failed update', async () => {
   await mkdir(path.join(process.cwd(), 'outputs', 'working'), { recursive: true });
@@ -127,4 +166,26 @@ test('validator safe categories retain timeout status and mask all unknown messa
     await assert.rejects(store.addLocal({name:'测试',content:'proxies: []'}), error => error.status === 504 && error.message === msg);
     assert.equal((await store.list()).profiles.length,0);
   } finally { await rm(directory, {recursive:true,force:true}); }
+});
+
+test('actual core failure categories survive profile import without disclosing core output', async t => {
+  const directory = await mkdtemp(path.join(process.cwd(), 'outputs', 'working', 'clash-profile-test-'));
+  t.after(() => rm(directory, {recursive:true,force:true}));
+  const secret = 'credential-secret-never-display';
+  let output;
+  const store = createProfileStore({directory, applyConfig:async()=>{}, validateConfig:async()=>{
+    throw coreValidationFailure({code:1,stdout:output});
+  }});
+  for (const [text, expected] of [
+    ['load GeoSite data error, base error: list ' + secret + ' not found in geosite.dat', /地理规则分类在本机数据库中不存在/],
+    ['load GeoSite data error: geosite.dat unexpected EOF ' + secret, /无法加载.*地理规则数据库/],
+    ['proxy 0: cipher: ' + secret + ' initialize error: unknown method', /加密方式或密钥参数/],
+    ['unrecognized internal failure ' + secret, /配置校验失败/]
+  ]) {
+    output = text;
+    await assert.rejects(store.addLocal({name:'测试',content:'mode: rule\nrules: []'}), error =>
+      error.status === 422 && expected.test(error.message) && !error.message.includes(secret));
+  }
+  assert.equal((await store.list()).profiles.length, 0);
+  assert.equal((await readdir(path.join(directory,'files'))).length, 0);
 });

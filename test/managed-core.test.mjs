@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { parse } from 'yaml';
 import { createManagedCore, safeRuntimeConfig, coreValidationFailure } from '../src/managed-core.mjs';
 
 test('validation failures are classified without exposing raw output or credentials', () => {
@@ -12,6 +13,11 @@ test('validation failures are classified without exposing raw output or credenti
     [{ code:1, stdout:'proxy 0: ' + secret + ' has unset fields: password' }, /缺少必要信息/],
     [{ code:1, stderr:'rule parse failed: ' + secret }, /策略组或规则/],
     [{ code:1, stderr:'yaml: unmarshal errors: ' + secret }, /字段与内核格式不匹配/],
+    [{ code:1, stdout:'rules[0] [GEOSITE,' + secret + ',DIRECT] error: load GeoSite data error, failed to decode geodata file: geosite.dat, base error: list ' + secret + ' not found in geosite.dat' }, /地理规则分类在本机数据库中不存在/],
+    [{ code:1, stderr:'load GeoIP data error, failed to decode geodata file: geoip.dat, base error: list ' + secret + ' not found in geoip.dat' }, /地理规则分类在本机数据库中不存在/],
+    [{ code:1, stderr:'load GeoSite data error, failed to decode geodata file: geosite.dat, base error: unexpected EOF ' + secret }, /无法加载.*地理规则数据库/],
+    [{ code:1, stdout:'proxy 0: ss ' + secret + ' cipher: invalid initialize error: unknown method: invalid' }, /加密方式或密钥参数/],
+    [{ code:1, stderr:'rules[12] [DOMAIN,' + secret + ',missing] error: target does not exist' }, /策略组或规则/],
     [{ code:'ENOENT', stderr:secret }, /代理内核无法启动/],
     [{ code:'ETIMEDOUT', stderr:secret }, /校验超时/],
     [{ code:1, stderr:secret }, /配置校验失败/]
@@ -21,6 +27,16 @@ test('validation failures are classified without exposing raw output or credenti
     assert.match(failure.message, expected);
     assert(!failure.message.includes(secret));
   }
+});
+
+test('runtime preprocessing accepts the download byte limit and rejects invalid content explicitly', () => {
+  // A large comment exercises the byte boundary without creating a huge YAML object.
+  const limit = 5 * 1024 * 1024;
+  const prefix = 'mode: rule\nrules: []\n#';
+  const content = prefix + 'a'.repeat(limit - Buffer.byteLength(prefix));
+  assert.match(safeRuntimeConfig(content, 0), /mixed-port: 0/);
+  assert.throws(() => safeRuntimeConfig(content + 'a', 0), error => error.status === 413 && /超过 5 MiB/.test(error.message));
+  assert.throws(() => safeRuntimeConfig('mode: rule\0', 0), /内容无效/);
 });
 
 test('real validation path classifies inner core failure without returning its output', async t => {
@@ -49,6 +65,24 @@ test('configuration blocks externally controlled listeners and TUN', () => {
   const merged = safeRuntimeConfig('defaults: &defaults\n  allow-lan: true\n  tun: { enable: true }\n<<: *defaults\ndns: {enable: true, listen: "0.0.0.0:53", nameserver: ["1.1.1.1"]}\nproxy-groups: [{name: Test, type: url-test, url: "http://127.0.0.1/private", interval: 1, proxies: [DIRECT]}]\nrules: []\n',12345);
   assert.match(merged, /allow-lan: false/); assert.doesNotMatch(merged,/0\.0\.0\.0:53|127\.0\.0\.1\/private/);
   assert.match(merged,/nameserver:/); assert.match(merged,/interval: 300/);
+});
+
+test('runtime always collects connection ownership regardless of imported process mode', () => {
+  for (const value of ['off', 'strict', 'always', 'false', 'unexpected']) {
+    const config = parse(safeRuntimeConfig(`mode: rule\nfind-process-mode: ${value}\nFIND-PROCESS-MODE: off\nFind-Process-Mode: strict\nproxies: []\nrules: [MATCH,DIRECT]\n`, 12345));
+    assert.equal(config['find-process-mode'], 'always');
+    assert.deepEqual(Object.keys(config).filter(key => /^find-process-mode$/i.test(key)), ['find-process-mode']);
+    assert.equal(config.mode, 'rule');
+    assert.equal(config['mixed-port'], 12345);
+    assert.deepEqual(config.proxies, []);
+    assert.deepEqual(config.rules, ['MATCH', 'DIRECT']);
+  }
+  const merged = parse(safeRuntimeConfig('defaults: &defaults\n  find-process-mode: off\n  FIND-PROCESS-MODE: strict\n  mode: global\n<<: *defaults\nproxies: []\nrules: [MATCH,DIRECT]\n', 23456));
+  assert.equal(merged['find-process-mode'], 'always');
+  assert.deepEqual(Object.keys(merged).filter(key => /^find-process-mode$/i.test(key)), ['find-process-mode']);
+  assert.equal(merged.mode, 'global');
+  assert.deepEqual(merged.rules, ['MATCH', 'DIRECT']);
+  assert.equal(parse(safeRuntimeConfig('mode: direct\nrules: []\n', 34567))['find-process-mode'], 'always');
 });
 
 test('owns a local core process and fails closed on bad configuration', async t => {

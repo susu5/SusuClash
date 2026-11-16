@@ -1,5 +1,4 @@
 import { spawn, execFile } from 'node:child_process';
-import { constants } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { access, mkdir, readFile, writeFile, copyFile, unlink, rename } from 'node:fs/promises';
 import net from 'node:net';
@@ -9,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { parseAllDocuments, stringify } from 'yaml';
 import { AppError, requestCore } from './mihomo.mjs';
+import { maxConfigBytes } from './config-limits.mjs';
+import { prepareCoreGeodata } from './geodata.mjs';
 
 const runFile = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,13 +26,22 @@ export function coreValidationFailure(error) {
     return new AppError('配置校验超时，请稍后重试。', 504);
   }
   const output = String(error?.stderr || '') + '\n' + String(error?.stdout || '');
+  if (/\b(?:geosite|geoip)\b/i.test(output) && /\blist\b[^\r\n]*\bnot found in\s+(?:geosite|geoip)\.dat\b/i.test(output)) {
+    return new AppError('订阅引用的地理规则分类在本机数据库中不存在，请使用包含该分类的兼容数据库。', 422);
+  }
+  if (/(?:load|decode|read|open|invalid|corrupt)[^\r\n]*(?:geosite\.dat|geoip\.dat|country\.mmdb|asn\.mmdb)|(?:geosite|geoip) data error/i.test(output)) {
+    return new AppError('无法加载订阅所需的地理规则数据库，请检查数据库文件是否完整且兼容。', 422);
+  }
   if (/unsupport(?:ed)?\s+proxy\s+type|unsupported\s+(?:proxy\s+)?protocol/i.test(output)) {
     return new AppError('订阅包含当前内核不支持的节点协议，请向服务商获取 Clash 格式。', 422);
   }
   if (/has unset fields|missing required fields?|missing required (?:field|parameter)/i.test(output)) {
     return new AppError('订阅中的节点缺少必要信息，请向服务商检查配置。', 422);
   }
-  if (/rule\s+parse|parse\s+rule|proxy\s*group|proxy\s+.*(?:not found|not exist)/i.test(output)) {
+  if (/unsupport(?:ed)?\s+cipher|cipher[^\r\n]*(?:unknown method|initialize error)|(?:invalid|incorrect)[^\r\n]*(?:key|salt) length/i.test(output)) {
+    return new AppError('订阅中的节点加密方式或密钥参数无法通过内核校验，请检查节点配置与内核版本。', 422);
+  }
+  if (/rule\s+parse|parse\s+rule|\brules\[\d+\][^\r\n]*\berror\b|proxy\s*group|proxy\s+.*(?:not found|not exist)/i.test(output)) {
     return new AppError('订阅中的线路、策略组或规则无法通过校验，请检查配置。', 422);
   }
   if (/yaml:\s*(?:unmarshal|line|cannot)|cannot unmarshal|invalid yaml/i.test(output)) {
@@ -43,7 +53,8 @@ export function coreValidationFailure(error) {
 // Resolve YAML aliases/merges before overriding privileged and listening fields.
 // Provider URLs require a separately controlled downloader and are rejected.
 export function safeRuntimeConfig(source, port) {
-  if (typeof source !== 'string' || Buffer.byteLength(source) > 4 * 1024 * 1024 || source.includes('\0')) throw new AppError('配置文件无效或过大。', 400);
+  if (typeof source !== 'string' || source.includes('\0')) throw new AppError('配置文件内容无效。', 400);
+  if (Buffer.byteLength(source) > maxConfigBytes) throw new AppError('配置文件超过 5 MiB。', 413);
   let data;
   try {
     const docs = parseAllDocuments(source, { merge:true, uniqueKeys:true });
@@ -51,7 +62,7 @@ export function safeRuntimeConfig(source, port) {
     data = docs[0].toJS({ maxAliasCount:50 });
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('not a mapping');
   } catch { throw new AppError('配置 YAML 格式无效或包含暂不支持的标签。', 400); }
-  const forbidden = /^(?:allow-lan|bind-address|authentication|skip-auth-prefixes|lan-allowed-ips|lan-disallowed-ips|secret|tun|listeners|tunnels|ntp|port|socks-port|mixed-port|redir-port|tproxy-port|geox-url|geo-auto-update|external-controller(?:-.*)?|external-ui(?:-.*)?)$/i;
+  const forbidden = /^(?:allow-lan|bind-address|authentication|skip-auth-prefixes|lan-allowed-ips|lan-disallowed-ips|secret|tun|listeners|tunnels|ntp|port|socks-port|mixed-port|redir-port|tproxy-port|find-process-mode|geox-url|geo-auto-update|external-controller(?:-.*)?|external-ui(?:-.*)?)$/i;
   for (const key of Object.keys(data)) {
     if (/^(dns|proxy-groups)$/i.test(key) && key !== key.toLowerCase()) throw new AppError('配置中的保留字段名称格式无效。', 400);
     if (/^(proxy-providers|rule-providers)$/i.test(key)) {
@@ -77,6 +88,9 @@ export function safeRuntimeConfig(source, port) {
   data['allow-lan'] = false;
   data['bind-address'] = '127.0.0.1';
   data['mixed-port'] = port;
+  // The connection list needs ownership for every connection, including those
+  // matched by domain/IP rules. Mihomo's default strict mode may skip lookup.
+  data['find-process-mode'] = 'always';
   data.tun = {enable:false};
   data.listeners = [];
   try { return stringify(data); }
@@ -98,11 +112,12 @@ async function checkPort(port) {
   await new Promise(resolve => server.close(resolve));
 }
 
-export function createManagedCore({ directory = defaultDataDir, binary = process.env.CLASH_APP_MIHOMO || ownBinary, launch = spawn, testFile = runFile } = {}) {
+export function createManagedCore({ directory = defaultDataDir, binary = process.env.CLASH_APP_MIHOMO || ownBinary, runtimeDirectory = path.join(root,'runtime'), launch = spawn, testFile = runFile } = {}) {
   let child = null, endpoint = null, currentStatus = 'stopped', message = '尚未启动内核', version = null, lastConfig = null, stopping = false;
   let pendingStart = null;
   let assignedProxyPort = null;
   let loadedPort = false;
+  let preparingDirectory = null;
   const coreDirectory = path.join(directory, 'core');
   const runtime = path.join(coreDirectory, 'runtime.yaml');
   function cleanEnvironment(secret) {
@@ -130,12 +145,8 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
     try { await writeFile(temp,JSON.stringify({port}),{mode:0o600,flag:'wx'}); await rename(temp,file); }
     finally { await unlink(temp).catch(()=>{}); }
   }
-  async function prepareDirectory() {
-    await mkdir(coreDirectory, { recursive: true });
-    for (const name of ['geoip.dat', 'geosite.dat', 'Country.mmdb', 'ASN.mmdb']) {
-      try { await copyFile(path.join(root, 'runtime', name), path.join(coreDirectory, name), constants.COPYFILE_EXCL); }
-      catch (error) { if (!['ENOENT', 'EEXIST'].includes(error.code)) throw error; }
-    }
+  function prepareDirectory() {
+    return preparingDirectory ??= prepareCoreGeodata({runtimeDirectory,coreDirectory}).finally(()=>{preparingDirectory=null;});
   }
   function status() { return { state: currentStatus, message, version }; }
   async function writeSafe(sourcePath, target, port) {
@@ -158,14 +169,20 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
   async function stop() {
     if (!child) { currentStatus = 'stopped'; message = '内核已停止'; endpoint = null; return; }
     stopping = true;
-    const old = child;
-    child = null; endpoint = null;
-    await new Promise(resolve => {
-      const timer = setTimeout(() => { old.kill('SIGKILL'); resolve(); }, 2500);
-      old.once('exit', () => { clearTimeout(timer); resolve(); });
-      old.kill();
-    });
-    stopping = false; currentStatus = 'stopped'; message = '内核已停止';
+    const old = child; endpoint = null;
+    try {
+      await new Promise((resolve,reject) => {
+        let forced=false;
+        const finish=()=>{clearTimeout(timer);clearTimeout(deadline);resolve();};
+        const timer=setTimeout(()=>{forced=true;try{old.kill('SIGKILL');}catch{}},2500);
+        const deadline=setTimeout(()=>{old.removeListener('exit',finish);reject(new AppError('无法确认受控内核已退出，请正常退出客户端后核对。',503));},6500);
+        old.once('exit',finish);
+        if(old.exitCode!==null && old.exitCode!==undefined){finish();return;}
+        try{old.kill();}catch{if(!forced)old.kill('SIGKILL');}
+      });
+      if(child===old)child=null;
+      currentStatus='stopped';message='内核已停止';
+    } finally {stopping=false;}
   }
   async function startInternal(sourcePath) {
     if (!await available()) { currentStatus = 'missing'; message = '未找到本软件的 Mihomo 内核'; throw new AppError(message, 503); }

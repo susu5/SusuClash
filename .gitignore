@@ -20,6 +20,7 @@ node_modules/
 outputs/
 /runtime/*
 !/runtime/README.md
+!/runtime/geodata.json
 profiles/
 subscriptions/
 logs/
@@ -37,3 +38,12 @@ theme.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated language/tool caches
+__pycache__/
+*.pyc
+.pytest_cache/
+# Local QA image/report outputs
+qa/screens/
+qa/native/
+*.wixpdb

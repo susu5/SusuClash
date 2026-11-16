@@ -1,81 +1,117 @@
-# 本地构建说明
+# 构建 SusuClash v0.1.24
 
-本仓库只包含项目源码、界面资源和示例设计图，不包含 Node.js、Mihomo、WebView2 SDK 或地理规则文件的二进制副本。Windows 安装包可从 [GitHub Releases](https://github.com/susu5/SusuClash/releases) 下载。自行构建时请在独立测试环境准备依赖并核查其来源和许可。不要把真实订阅、运行时配置、日志或浏览器数据放进仓库。
+本仓库提供客户端、Netfix、原生窗口和 MSI 安装器源码。运行依赖与安装包通过 Release 单独提供，用户订阅、认证、配置和运行日志不进入源码。
 
-## 复现 0.1.9 公开版 MSI
+v0.1.24 是预发布版，保留已知的安装结果／启动提示误判风险；构建过程不会自动修复这些问题。功能源码与已交付 MSI 的对应关系见 [SOURCE-MAPPING.md](SOURCE-MAPPING.md)，固定输入见 `packaging/release-dependencies-v0.1.24.json`。
 
-在独立文件夹准备 `packaging/release-dependencies-v0.1.8.json` 中列出的上游文件。下表列出打包脚本需要的文件名；所有输入均按该清单验证 SHA-256，`yaml` 还须匹配锁文件 SHA-512。许可证原文位于仓库 `licenses/` 中，脚本同时核查许可文件。
+## 环境与设计检查
 
-| 依赖文件 | 准备方式 |
-| --- | --- |
-| `node-official.exe`、`NODE-LICENSE` | 从 Node.js 24.22.1 官方 Windows x64 ZIP 提取 `node.exe` 和 `LICENSE` 并分别改名；也可从清单中的官方下载地址取得相同的 exe。 |
-| `mihomo-official.exe` | 从清单所列 Mihomo v1.19.33 compatible 官方 ZIP 提取 Windows x64 可执行文件并改名。 |
-| `geoip.dat`、`geosite.dat` | 下载清单所列 V2Fly GeoIP 与 Domain List Community 发行文件，后者将 `dlc.dat` 改名为 `geosite.dat`。 |
-| `dbip-country-lite-2026-11.mmdb`、`dbip-asn-lite-2026-11.mmdb` | 下载清单中的 DB-IP `.mmdb.gz` 并解压。 |
-| `microsoft.web.webview2.1.0.4078.44.nupkg`、`yaml-2.8.1.tgz` | 从清单中的 NuGet、npm 官方地址原样下载。 |
+- Windows x64、Python 3.9 或更新版本、Node.js 22 或更新版本；发布输入固定为 Node.js 24.22.1。
+- .NET Framework C# 编译器：`%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`。
+- WiX Toolset 7.0.0 与同版 `WixToolset.UI.wixext`，`wix` 在 PATH 中。原生 DTF 打包使用下面单独核验的 NuGet 包。遵守随组件提供的许可证和维护协议。
+- 运行客户端还需 Microsoft Edge WebView2 Runtime。SDK并不包含或安装该运行时。
 
-具备下列构建工具并将 `wix` 加入 PATH，在仓库根目录运行（替换为自己的独立目录；输出文件必须尚不存在）：
+在独立工作目录准备源码依赖后运行：
 
 ```powershell
-python packaging\build_msi_release.py --deps C:\release-deps --work-dir C:\release-work --output C:\release-output\SusuClash-Setup-x64-v0.1.9.msi
+npm install --ignore-scripts --package-lock=false
+npm run design:check
+npm run test:design
 ```
 
-此脚本从源码重新编译窗口宿主并打包所列运行依赖，保留与 0.1.7 相同的安装位置和升级代码；不会读取用户订阅或配置，不会给 MSI 签名。详细来源、许可及归属见 [第三方声明](THIRD_PARTY_NOTICES.md)。本版 V2Fly 地理规则数据不一定包含 Mihomo Meta 专用的全部分类，使用相关规则的订阅可能需要兼容的规则数据。
+如使用 pnpm，可用 `pnpm install --frozen-lockfile --ignore-scripts`。设计基准为 `DESIGN.md` author-v3：小字12px、卡片18px。共享CSS由规范生成，不要手改；变量检查不代替三主题截图与交互验收。
 
-## 依赖与工具
+## 准备发行输入
 
-- Windows x64，已安装 Microsoft Edge WebView2 Runtime。
-- Node.js 22 或更新版本和 npm（已测试的本地运行时为 Node.js 24.22.1）。
-- Python 3、WiX Toolset 4 或更新版本及 `WixToolset.UI.wixext`（仅在制作 MSI 时需要）。
-- .NET Framework C# 编译器（Windows x64 的 `Framework64\v4.0.30319\csc.exe`）。
-- WebView2 SDK [Microsoft.Web.WebView2 1.0.4078.44](https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.4078.44)；遵循其许可及通知要求。
-- Windows x64 的 [Mihomo 内核](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.33)及所需的地理规则文件。开发环境曾使用 Mihomo 1.19.33；各地理数据库应核对各自来源和授权，不能假定它们拥有相同许可证。
+示例将客户端依赖放在 `C:\susu-build\deps`，安装器输入放在 `C:\susu-build\installer-deps`。两个目录都应独立于正在使用的客户端数据目录。逐项核对依赖清单中的来源、SHA-256；`yaml` 还须匹配锁文件的 SHA-512。打包脚本不下载依赖，不读取真实用户配置，也不执行安装。
 
-## 准备源码依赖
+| `--deps` 中的文件 | 获取方式 |
+| --- | --- |
+| `node-official.exe`、`NODE-LICENSE` | 从清单指定的官方 Node.js 24.22.1 Windows x64 ZIP提取 `node.exe` 和 `LICENSE` 后改名。 |
+| `mihomo-official.exe` | 从清单指定的 Mihomo v1.19.33 compatible Windows x64 ZIP提取并改名。 |
+| `geoip.dat`、`geosite.dat` | 使用清单固定的 V2Fly GeoIP 与 MetaCubeX GeoSite 字节；GeoSite 还需匹配 `runtime/geodata.json`。 |
+| `dbip-country-lite-2026-11.mmdb`、`dbip-asn-lite-2026-11.mmdb` | 按清单下载DB-IP归档并解压，核对解压后的哈希。 |
+| `microsoft.web.webview2.1.0.4078.44.nupkg`、`yaml-2.8.1.tgz` | 从清单指定的 NuGet、npm地址取得原始归档。 |
 
-在项目根目录执行：
+| `--installer-deps` 中的文件 | 获取方式 |
+| --- | --- |
+| `wixtoolset.dtf.windowsinstaller.7.0.0.nupkg` | 清单指定的官方 NuGet 包，保持原始字节。 |
+| `wixtoolset.dtf.customaction.7.0.0.nupkg` | 清单指定的官方 NuGet 包，保持原始字节。 |
+| `wix-b8977d6-source.tar.gz` | 清单指定的官方固定源码提交；MSI把该对应源码放入 `licenses/`，不执行归档内容。 |
+| `SusuClashWindow.exe` | 使用本版 Release 中公开的宿主输入，或从本版MSI纯解包提取，方法见下文。 |
+
+`licenses/` 中的全部许可原文必须保留。打包器核对已固定的许可哈希，不接受用其他版本的同名文件替换。
+
+## 可公开取得的窗口宿主输入
+
+v0.1.24 只改安装器，固定复用已核验的客户端宿主字节，以维持客户端与 v0.1.23 一致。此宿主现作为 v0.1.24 Release 的独立构建输入公开，不需要任何未发布版本的本机目录。
+
+从 [v0.1.24 预发布](https://github.com/susu5/SusuClash/releases/tag/v0.1.24) 下载 `SusuClashWindow-x64-v0.1.24.exe`，核对下面哈希，复制到 `--installer-deps` 目录并改名 `SusuClashWindow.exe`。不要为了准备构建输入运行它。
+
+```text
+e46640b1a79f13e7a173d2d5273a9064cec97c799b6e1883233e383a570eaebd
+```
+
+也可在独立目录用 WiX 的纯解包功能处理本版MSI（不使用 `msiexec /i`）：
 
 ```powershell
-npm install --ignore-scripts
+wix msi decompile -x C:\susu-build\extracted C:\susu-build\SusuClash-Setup-x64-v0.1.24.msi -o C:\susu-build\extracted.wxs
 ```
 
-项目的 YAML 解析器版本为 `yaml@2.8.1`，依赖信息记录在 `package.json` 和 `pnpm-lock.yaml` 中。如果使用 pnpm，可以运行 `pnpm install --frozen-lockfile`。
+在提取出的 `File` 目录按 `extracted.wxs` 的 `File` 记录定位 `runtime/webview2/SusuClashWindow.exe` 对应文件，复制为上述输入并核对哈希。独立 Release 资产提供同一字节，通常无需此替代步骤。
 
-## 准备窗口宿主
+宿主源码是 `src/window-host.cs`，本版源码SHA-256：
 
-从 Microsoft 官方渠道获取并解压上面指定的 NuGet SDK 包，在项目内创建 `runtime\webview2`，复制 SDK 包中的以下文件：
+```text
+42420164237d2e73b2fce8d19b7eaf9e3e49c077c66fc667b2c5c1dac63a0cf7
+```
 
-| SDK 包路径 | 项目中的目标路径 |
+若用于自己的源码构建，可以按下节重新编译；新编译产物的PE元数据可能不同。发行打包入口会严格拒绝与 `buildProducts` 不同的二进制；自己的发行版需审核自己的产物并更新其构建清单，不能把不同字节称为官方输入。
+
+## 构建 MSI
+
+在仓库根目录运行，输出文件必须尚不存在：
+
+```powershell
+python packaging\build_msi_release.py `
+  --deps C:\susu-build\deps `
+  --installer-deps C:\susu-build\installer-deps `
+  --work-dir C:\susu-build\work `
+  --output C:\susu-build\output\SusuClash-Setup-x64-v0.1.24.msi
+```
+
+构建器校验输入与许可，用真实 Mihomo 检查 GeoSite 兼容性，再从当前规范生成原生主题、编译内嵌界面和只读重启状态动作。MSI保留既有升级族、安装目录与数据目录；不签名、不运行生成的MSI、不改系统代理。公开说明文档经过整理，且编译／MSI元数据可能变化，因此不承诺逐字节重现已发布的整个MSI。
+
+## 从源码编译客户端宿主
+
+从固定 WebView2 SDK NuGet 包提取以下文件到 `runtime\webview2`：
+
+| SDK 内路径 | 目标文件名 |
 | --- | --- |
-| `lib\net462\Microsoft.Web.WebView2.Core.dll` | `runtime\webview2\Microsoft.Web.WebView2.Core.dll` |
-| `lib\net462\Microsoft.Web.WebView2.WinForms.dll` | `runtime\webview2\Microsoft.Web.WebView2.WinForms.dll` |
-| `runtimes\win-x64\native\WebView2Loader.dll` | `runtime\webview2\WebView2Loader.dll` |
-| `LICENSE.txt` 和 `NOTICE.txt` | `runtime\webview2\` 下的同名文件 |
-
-在项目根目录编译宿主：
+| `lib/net462/Microsoft.Web.WebView2.Core.dll` | `Microsoft.Web.WebView2.Core.dll` |
+| `lib/net462/Microsoft.Web.WebView2.WinForms.dll` | `Microsoft.Web.WebView2.WinForms.dll` |
+| `runtimes/win-x64/native/WebView2Loader.dll` | `WebView2Loader.dll` |
+| `LICENSE.txt`、`NOTICE.txt` | 保留原文件名 |
 
 ```powershell
 & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /platform:x64 /out:runtime\webview2\SusuClashWindow.exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:runtime\webview2\Microsoft.Web.WebView2.Core.dll /reference:runtime\webview2\Microsoft.Web.WebView2.WinForms.dll src\window-host.cs
 ```
 
-## 准备内核和规则
+开发运行另需准备 `runtime\mihomo.exe` 及规则数据、Node运行时或本机Node环境。运行 `Start-Clash-Glass.cmd` 前确认使用独立测试数据，避免覆盖真实配置。
 
-自行获取符合许可要求的 Windows x64 Mihomo 内核并放置为 `runtime\mihomo.exe`。根据自己的使用场景准备 `runtime\geoip.dat`、`runtime\geosite.dat`、`runtime\Country.mmdb` 和 `runtime\ASN.mmdb`。制作 MSI 的脚本会检查以上四个文件均存在；仓库不指定这些数据的来源或再分发授权。
-
-如需制作现有 MSI，打包脚本还要求将自行准备的 Windows x64 Node 运行时置于 `runtime\node\`，包含 `node.exe` 和它所需的 DLL。完成所有依赖和许可核查后，在项目根目录运行：
-
-```powershell
-python packaging\build_msi_v3.py
-```
-
-输出位于本地 `outputs\candidate\`。现有打包脚本不会替你取得依赖或核查第三方再分发授权，也不会为安装包签名。
-
-## 隔离测试
-
-准备好对应测试依赖后，可在项目根目录运行：
+## 测试与原生安装器验证
 
 ```powershell
 node --test test/*.test.mjs
+powershell -NoProfile -File qa\test-installer-model.ps1
 ```
 
-原生窗口和内核相关测试依赖已准备的组件；缺失时不代表测试已通过。测试应使用临时数据，不要使用真实订阅、账户配置或系统代理状态。
+单元测试使用临时目录。内核、窗口及原生属性相关用例需要对应运行依赖和Windows权限；跳过项不能视作通过。浏览器预览使用 `scripts/preview-client.cjs` 的内存桥，不能加载到生产客户端。
+
+制作MSI后，工作目录 `public-msi-build-*/installer/installer-build.json` 绑定原生组件、资源和源码哈希。下面默认只构建随机测试包并做不执行安装序列的初始化烟测；Python参数显式使用自己的安装路径：
+
+```powershell
+powershell -NoProfile -File qa\test-installer-native.ps1 -Receipt C:\susu-build\work\public-msi-build-EXAMPLE\installer\installer-build.json -Python C:\Python\python.exe
+```
+
+只有在隔离测试环境明确加 `-RunMarker` 才会执行独立随机产品族、单标记文件的安装和清理。不得将该工具用于真实 SusuClash 产品或真实数据目录。安装后启动提示仍有已知风险，标记包测试不能替代真实用户升级与应用启动验证。

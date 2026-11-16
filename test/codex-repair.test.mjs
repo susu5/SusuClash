@@ -36,6 +36,16 @@ test('ACL failure or foreign listener fails closed and preserves configuration',
  service=createCodexRepair({core,directory:dir,readListeners:async()=>[{port:7891,pid:'456'}],probe:async()=>204,copyPermissions:async()=>{throw new Error('cannot preserve permissions')}});let p=await service.preview();assert(p.eligible);let r=await service.apply(p.token);assert.equal(r.ok,false);assert.equal(await readFile(path.join(dir,'.env'),'utf8'),'HTTPS_PROXY=http://127.0.0.1:7890\nSECRET=private\n');assert.deepEqual(await readdir(dir),['.env']);
 });
 
+test('explicit known-file repair can leave an occupied old port intact and rejects changed owners',async t=>{
+ const f=await setup(t,'HTTPS_PROXY=http://127.0.0.1:7890\n');
+ f.owners([{port:7890,pid:'100',address:'127.0.0.1',name:'other.exe'},{port:7891,pid:'456',name:'mihomo.exe'}]);
+ let p=await f.service.preview({allowOccupiedOldPort:true});assert.equal(p.eligible,true);assert.equal(p.oldPortOccupied,true);
+ f.owners([{port:7890,pid:'101',address:'127.0.0.1',name:'other.exe'},{port:7891,pid:'456',name:'mihomo.exe'}]);
+ assert.equal((await f.service.apply(p.token)).ok,false);
+ p=await f.service.preview({allowOccupiedOldPort:true});assert.equal((await f.service.apply(p.token)).ok,true);
+ assert.equal(await readFile(path.join(f.dir,'.env'),'utf8'),'HTTPS_PROXY=http://127.0.0.1:7891\n');
+});
+
 test('rejects symlinked or reparse-point configuration directory',async t=>{
  const root=path.resolve('outputs/working');await mkdir(root,{recursive:true});const base=await mkdtemp(path.join(root,'codex-link-test-'));t.after(()=>rm(base,{recursive:true,force:true}));const real=path.join(base,'real');await mkdir(real);await writeFile(path.join(real,'.env'),'HTTPS_PROXY=http://127.0.0.1:7890\n');const link=path.join(base,'link');try{await symlink(real,link,process.platform==='win32'?'junction':'dir')}catch(e){if(['EPERM','EACCES'].includes(e.code))return t.skip('creating links requires privileges');throw e};const core={applyConfig(){},processId(){return 456},status(){return {state:'running'}},async call(){return {'mixed-port':7891}}};const service=createCodexRepair({core,directory:link,readListeners:async()=>[{port:7891,pid:'456'}],probe:async()=>204,copyPermissions:async()=>{}});assert.equal((await service.preview()).eligible,false);assert.equal(await readFile(path.join(real,'.env'),'utf8'),'HTTPS_PROXY=http://127.0.0.1:7890\n');
 });

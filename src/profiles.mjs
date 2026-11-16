@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { maxConfigBytes } from './config-limits.mjs';
+import { readMetadataSnapshot, writeAtomicMetadata } from './atomic-metadata.mjs';
 
-const maxBytes = 5 * 1024 * 1024;
+const maxBytes = maxConfigBytes;
 const uuid = /^[a-f0-9-]{36}$/i;
 
 // Subscription providers may send numeric traffic metadata in this header.
@@ -70,39 +72,36 @@ function isNodeLinkList(value) {
   catch { return false; }
 }
 
-async function atomicWrite(filename, data) {
-  const tmp = filename + '.' + randomUUID() + '.tmp';
-  try {
-    await writeFile(tmp, data, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-    await rename(tmp, filename);
-  } finally { await rm(tmp, { force: true }).catch(() => {}); }
-}
-
 /**
  * Isolated profile storage. Validators must test the exact candidate with the
  * chosen core and must reject unsupported content. Application must either
  * load successfully or reject without replacing the previous running config.
  * The returned profile metadata never exposes subscription URLs or config paths.
  */
-export function createProfileStore({ directory, validateConfig, applyConfig, fetchImpl = globalThis.fetch, timeoutMs = 12000 } = {}) {
+export function createProfileStore({ directory, validateConfig, applyConfig, fetchImpl = globalThis.fetch, timeoutMs = 12000, system = {} } = {}) {
   if (!directory || typeof validateConfig !== 'function' || typeof applyConfig !== 'function') throw new TypeError('directory, validateConfig and applyConfig are required');
   const root = path.resolve(directory);
   const filesDir = path.join(root, 'files');
   const manifestPath = path.join(root, 'profiles.json');
   let pending = Promise.resolve();
   let state;
+  let manifestFingerprint;
 
   async function init() {
     if (state) return;
     await mkdir(filesDir, { recursive: true, mode: 0o700 });
     try {
-      const parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
+      const snapshot = await readMetadataSnapshot(manifestPath);
+      if (snapshot.bytes === null) { state = { activeId: null, profiles: [] }; manifestFingerprint = null; return; }
+      const parsed = JSON.parse(snapshot.bytes.toString('utf8'));
       if (!parsed || !Array.isArray(parsed.profiles) || (parsed.activeId !== null && typeof parsed.activeId !== 'string')) throw new Error('invalid manifest');
       for (const item of parsed.profiles) if (!uuid.test(item.id) || !uuid.test(item.version)) throw new Error('invalid profile identifier');
       state = parsed;
+      manifestFingerprint = snapshot.fingerprint;
     } catch (error) {
       if (error.code !== 'ENOENT') throw new ProfileError('无法读取配置列表，请检查本地数据。', 500);
       state = { activeId: null, profiles: [] };
+      manifestFingerprint = null;
     }
   }
   function exclusive(action) {
@@ -120,7 +119,14 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
     return { id: item.id, name: item.name, kind: item.kind, active: state.activeId === item.id, loaded: true,
       lastSuccess: item.lastSuccess, lastError: item.lastError || null, usage: publicUsage(item.usage) };
   }
-  async function persist(next) { await atomicWrite(manifestPath, JSON.stringify(next, null, 2)); state = next; }
+  async function assertManifestCurrent() {
+    const current = await readMetadataSnapshot(manifestPath);
+    if (JSON.stringify(current.fingerprint) !== JSON.stringify(manifestFingerprint)) throw new ProfileError('配置列表已被其他程序修改，请重新加载后重试。', 409);
+  }
+  async function persist(next) {
+    const saved = await writeAtomicMetadata(manifestPath, JSON.stringify(next, null, 2), { expected: manifestFingerprint, renameMetadata: system.renameMetadata, hook: system.hook });
+    manifestFingerprint = saved.fingerprint; state = next;
+  }
   async function candidate(content) {
     const version = randomUUID();
     const target = file(version);
@@ -134,6 +140,13 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
         '配置顶层格式暂不受支持，请使用标准 YAML 配置。', '配置 YAML 格式无效或包含暂不支持的标签。',
         '配置中的 DNS 设置格式无效。', '配置中的保留字段名称格式无效。', '配置包含暂不支持的循环引用。',
         '代理内核无法启动，请检查文件和系统权限。', '配置校验超时，请稍后重试。',
+        '配置文件内容无效。', '配置文件超过 5 MiB。', '配置校验失败，请检查格式和内核支持的协议。',
+        '订阅引用的地理规则分类在本机数据库中不存在，请使用包含该分类的兼容数据库。',
+        '无法加载订阅所需的地理规则数据库，请检查数据库文件是否完整且兼容。',
+        '软件随附的地理规则数据库校验失败，请重新安装软件。',
+        '无法准备本地地理规则数据库，请检查数据目录的权限和可用空间。',
+        '地理规则数据库已被其他进程修改，请重试。',
+        '订阅中的节点加密方式或密钥参数无法通过内核校验，请检查节点配置与内核版本。',
         '订阅包含当前内核不支持的节点协议，请向服务商获取 Clash 格式。', '订阅中的节点缺少必要信息，请向服务商检查配置。',
         '订阅中的线路、策略组或规则无法通过校验，请检查配置。', '订阅中的配置字段与内核格式不匹配，请检查配置。'
       ]);
@@ -182,6 +195,7 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
     try {
       const fetched = await download(source);
       c = await candidate(fetched.content);
+      await assertManifestCurrent();
       if (state.activeId === id) await applyConfig(c.target);
       const changed = { ...item, name, url: source, version: c.version, lastSuccess: new Date().toISOString(), lastError: null, usage: fetched.usage };
       try { await persist({ ...state, profiles: state.profiles.map(p => p.id === id ? changed : p) }); }
@@ -220,6 +234,7 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
     restoreActive: () => exclusive(async () => {
       if (!state.activeId) return null;
       const item = find(state.activeId);
+      await assertManifestCurrent();
       try { await validateConfig(file(item.version)); await applyConfig(file(item.version)); }
       catch { throw new ProfileError('无法恢复上次配置，请检查内核或配置。', 503); }
       return publicProfile(item);
@@ -227,6 +242,7 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
     activate: id => exclusive(async () => {
       const item = find(id);
       if (state.activeId === id) return publicProfile(item);
+      await assertManifestCurrent();
       try { await validateConfig(file(item.version)); await applyConfig(file(item.version)); }
       catch { throw new ProfileError('配置启用失败，旧配置文件已保留；请检查运行状态。', 422); }
       const previousId = state.activeId;

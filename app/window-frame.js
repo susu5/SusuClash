@@ -9,6 +9,13 @@
   document.body.insertBefore(bar, document.querySelector('.app'));
   const send = message => bridge.postMessage(message);
   bar.querySelectorAll('[data-window]').forEach(button => button.addEventListener('click', () => send('window:' + button.dataset.window)));
+  // The WebView fills the frame; keep resize handles transparent and inside it.
+  document.addEventListener('pointerdown', event => {
+    if(event.button!==0||document.documentElement.classList.contains('native-maximized'))return;
+    const edge=5,left=event.clientX<edge,right=event.clientX>=innerWidth-edge,top=event.clientY<edge,bottom=event.clientY>=innerHeight-edge;
+    const hit=top?(left?13:right?14:12):bottom?(left?16:right?17:15):left?10:right?11:0;
+    if(hit){event.preventDefault();event.stopImmediatePropagation();send('window:resize:'+hit);}
+  },true);
   let dragStart = null;
   bar.addEventListener('pointerdown', event => {
     if (event.button !== 0 || event.target.closest('button')) return;

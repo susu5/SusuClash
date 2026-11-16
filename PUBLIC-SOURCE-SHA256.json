@@ -1,0 +1,647 @@
+{
+  "version": "0.1.24",
+  "msi": {
+    "filename": "SusuClash-Setup-x64-v0.1.24.msi",
+    "sha256": "06274d125b32eebabf63d56b45d6920275ce8cc960f1c1d0223362fe4f80adcd",
+    "bytes": 75469040
+  },
+  "scope": "Functional source, assets, build inputs, design contract and tests; curated public docs excluded",
+  "files": {
+    ".impeccable/design.json": {
+      "sha256": "d273d630c620a3891074a3d40580e7dc74127d0e45baf66965e05462af714589",
+      "bytes": 21877
+    },
+    "app/app.css": {
+      "sha256": "503944a4a1037048739f5de0fa14014bbe1caf57349f13b2ba67ebe34edf13a9",
+      "bytes": 23039
+    },
+    "app/app.js": {
+      "sha256": "933bb3d80eef89a4797b5c9bbaa47ac92bfd2bc7d89ecf2dd72f536fb6105b9e",
+      "bytes": 44492
+    },
+    "app/cat-motion.gif": {
+      "sha256": "086b9ba1568b66a32a119ad300d86591d423698bbb1f7d930c207645c228af99",
+      "bytes": 1224800
+    },
+    "app/cat-poster.png": {
+      "sha256": "956e8ac57d8036db9e722be3d5fbe78c2a5ab5822fcecae42c1374ea9a4d4c6e",
+      "bytes": 148658
+    },
+    "app/codex-repair.js": {
+      "sha256": "d6927ba53a11e16f5e17bb67bdf6a56080f4404d7c7eeeb9a3d1c2cc4861d3c3",
+      "bytes": 5338
+    },
+    "app/design-system.css": {
+      "sha256": "1775816afd7cb74e6e02f831ae5a42d44759d733a02b7b6e8f3de0ade8378fb0",
+      "bytes": 10856
+    },
+    "app/doctor.css": {
+      "sha256": "d4f8cefa0906c5776b0193fcd2d2fd6e1bd012cde7d7d0b8054f7d34e1dc408f",
+      "bytes": 32043
+    },
+    "app/doctor.js": {
+      "sha256": "9c90a29bc1175f7202486df9debc744279f35161c8d98464cbe82be83f57023d",
+      "bytes": 21076
+    },
+    "app/fish-motion.gif": {
+      "sha256": "d113132496f8e0ffd506aec0bf0a68b2ce4fda94a473861f593a0ef8870aff9c",
+      "bytes": 1060118
+    },
+    "app/fish-poster.png": {
+      "sha256": "57094552f56fbf5ade4ae8b5ac7d8ae6a0e1cd0eb1892683f4433d808b0c0e8c",
+      "bytes": 120496
+    },
+    "app/icon.ico": {
+      "sha256": "c6484f40ffd939ed0347ea927b4cc8b99ba4fa7ec9ac9c6082726c9e058b4567",
+      "bytes": 17361
+    },
+    "app/icon.svg": {
+      "sha256": "e36a3c691346f3dc9c34e22f5b64cc2c54ab081b017cf0c39735ba18ce0c4ab9",
+      "bytes": 991
+    },
+    "app/index.html": {
+      "sha256": "9804f5873cc2719e56b88d4b49ce7b78ea0153e056b05686690fbc8a9380fd63",
+      "bytes": 33478
+    },
+    "app/lines-v3.css": {
+      "sha256": "9d6f0842ec75da894672b5f31ab6cac1bb16175b0103ca3d67c6abfc419408bb",
+      "bytes": 5222
+    },
+    "app/lines-v3.js": {
+      "sha256": "0651d874e2265e21bb0a0ad879cd9e7e2ce3ff997ac69e9492dd88ae8d8c3698",
+      "bytes": 7000
+    },
+    "app/netfix.css": {
+      "sha256": "74eb281f93f2f736440fdd73db126ef3e8fe68365a6b7f9f2d34715290f0819c",
+      "bytes": 9707
+    },
+    "app/netfix.js": {
+      "sha256": "bf6fd8c9ce19c7703e86500e305803300f7d59fa7ff307cb052c38c385518b29",
+      "bytes": 22639
+    },
+    "app/secondary-fix.css": {
+      "sha256": "16caeed5fd8297b9adb33c22ab11c273b0ece7afde374c152013f5e48e1247e2",
+      "bytes": 3612
+    },
+    "app/secondary-fix.js": {
+      "sha256": "31272ce45133bea959bd59dd04bbca888b8ffb5d97d3721fe26b62b316c96b76",
+      "bytes": 12929
+    },
+    "app/settings-v2.css": {
+      "sha256": "d7047d88bebd8e41c528dad10da6234f390dd1417d6fbf44cddec41516c55f57",
+      "bytes": 11893
+    },
+    "app/settings-v2.js": {
+      "sha256": "06724b95a3f8daca06e990cc6a06787ab0f0012cb7439b8a771d195509743a21",
+      "bytes": 8923
+    },
+    "app/theme-v2.css": {
+      "sha256": "87d38f647d1bbc721933fc1ee5975881be7bc7217eec1cb1f98918abf3cfb406",
+      "bytes": 12862
+    },
+    "app/theme-v2.js": {
+      "sha256": "e750eb7fa5487bf5d373f00a0afdd045092d6e1391382ee6d72a95df720ada83",
+      "bytes": 10813
+    },
+    "app/update-check.css": {
+      "sha256": "399dc4e8d830b984c74974a96ea45b19b9467a195d8390838a57368b21a86bc7",
+      "bytes": 4116
+    },
+    "app/update-check.js": {
+      "sha256": "5119b45fbeed1612654b60f3850af95155db35bbf5ed79c20fef82b6c304b407",
+      "bytes": 12577
+    },
+    "app/visual-contract.css": {
+      "sha256": "05b558ecafad84828d4df13c3a931a56437c09de771c26299973425e401c1e2f",
+      "bytes": 14827
+    },
+    "app/visual-contract.js": {
+      "sha256": "b8f2273f2032e9256769f0bf1bc285a9a48c2e5025c83e2e10dafe6fc4e03d7b",
+      "bytes": 1511
+    },
+    "app/visual-polish.css": {
+      "sha256": "04819576214af0a9f870b1044c1d8008afee4a190550df4de738f44ad96dd210",
+      "bytes": 11715
+    },
+    "app/whale-motion.gif": {
+      "sha256": "7de18601e402a28d2b2785bfa44b76025f75ab69a9ecb13852071630c0a1d780",
+      "bytes": 751640
+    },
+    "app/whale-poster.png": {
+      "sha256": "a5badc1c4befad9edc2085dcae1150ec2b897be3f59af739e561666c39eaedfe",
+      "bytes": 91948
+    },
+    "app/window-frame.css": {
+      "sha256": "a432de34262b8ce4ad3c77edaa72cfd3eafdf05b35906be997ecf2a8be391dbd",
+      "bytes": 1872
+    },
+    "app/window-frame.js": {
+      "sha256": "94a38a63aae8b48dbbda4c0204fc2a084ba524a262faad919c3bb52fd420b6c3",
+      "bytes": 3331
+    },
+    "design/reference/author-about-approved-v3.png": {
+      "sha256": "222e51d87c94f4980e1b5370fa594f546d11b9a6dc976f63dd437579e0634c34",
+      "bytes": 676487
+    },
+    "DESIGN.md": {
+      "sha256": "917ada8ac10876652aca5570bc923aca86d8121f6d218c3ea477116894441bfc",
+      "bytes": 20432
+    },
+    "LICENSE": {
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "bytes": 35147
+    },
+    "licenses/CC-BY-SA-4.0.txt": {
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "bytes": 20138
+    },
+    "licenses/DB-IP-CC-BY-4.0.txt": {
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "bytes": 18657
+    },
+    "licenses/MetaCubeX-GeoSite-GPL-3.0.txt": {
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149
+    },
+    "licenses/Mihomo-GPL-3.0.txt": {
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149
+    },
+    "licenses/Node-LICENSE.txt": {
+      "sha256": "ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9",
+      "bytes": 160555
+    },
+    "licenses/V2Fly-GeoIP-CC-BY-SA-4.0.txt": {
+      "sha256": "5e436ff8ffbb77d8607220e9bce20c8915d860010feeb6c1ebef5a85688e9b39",
+      "bytes": 20137
+    },
+    "licenses/V2Fly-GeoSite-MIT.txt": {
+      "sha256": "b9d84a22870d3f21c91a4c6e410c9cc51d00902f5233ad0c84011479244bf7d2",
+      "bytes": 1067
+    },
+    "licenses/WebView2-LICENSE.txt": {
+      "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+      "bytes": 1487
+    },
+    "licenses/WebView2-NOTICE.txt": {
+      "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+      "bytes": 3894
+    },
+    "licenses/WiX-MS-RL.txt": {
+      "sha256": "dfdf2048787635215a6baf3b9d461dee89a2904d246787258a44f072a98d4786",
+      "bytes": 3341
+    },
+    "licenses/WiX-OSMF-EULA.txt": {
+      "sha256": "3358af585772039e45d1192213838f906a478463ac3bb4da208ec0d874c2219b",
+      "bytes": 3565
+    },
+    "licenses/yaml-ISC.txt": {
+      "sha256": "5bba27375d93e9119f76c1015f7672cf9ad5f70952296e0842fb2243d6376869",
+      "bytes": 738
+    },
+    "package.json": {
+      "sha256": "914cebad6f6cc35d40a516ce62088479eb2ff015f83e8bc9219ac7e40d624533",
+      "bytes": 458
+    },
+    "packaging/build_installer_ui.py": {
+      "sha256": "0b861b6d0722fb0cc4a338de24b8e9e8e6bb25436f2e51948dc7e5691b7cd7e0",
+      "bytes": 6619
+    },
+    "packaging/build_msi_release.py": {
+      "sha256": "5bbbae537d0335ad13dbd49c02710b72bd15f4e32bdb10a1ba51ef2c9d1bf79e",
+      "bytes": 16814
+    },
+    "packaging/installer/EmbeddedUI.config": {
+      "sha256": "7fe55465a940a873a5644a260f46595260bc234360e3e057189e9c775b66bcde",
+      "bytes": 180
+    },
+    "packaging/installer/EmbeddedUI.cs": {
+      "sha256": "13c8167f1a7b283161c4c8e15e5ad10a6ba5d4f29d9f283d3a94ba138dc6ad16",
+      "bytes": 16426
+    },
+    "packaging/installer/EngineProgress.cs": {
+      "sha256": "c86767cc21b53cb3c182b4bc1a0e59bac36c449ea5bd3f1f9812d86cbb837610",
+      "bytes": 10984
+    },
+    "packaging/installer/generate-theme.cjs": {
+      "sha256": "9f2073fc539a926fa052502b862e8cf66d2d6d4ade8ba32368f188585a959214",
+      "bytes": 3998
+    },
+    "packaging/installer/InstallerForm.cs": {
+      "sha256": "2e62e0c7369ba7034fcaaa0173d52973943777f912061402f7a906e943278424",
+      "bytes": 65935
+    },
+    "packaging/installer/RebootState.cs": {
+      "sha256": "d59cddeadb6efb70b9f14dc3e730182c455f1a0965ce4480a700703ad5f40991",
+      "bytes": 1382
+    },
+    "packaging/release-dependencies-v0.1.10.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.11.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.12.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.13.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.14.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.15.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.16.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.17.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.18.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.19.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.20.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.21.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.22.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.23.json": {
+      "sha256": "2d722c0e7b22e24057660f6a4247e22c9cf33fe7bfcbdfee81496982b4611aec",
+      "bytes": 7393
+    },
+    "packaging/release-dependencies-v0.1.24.json": {
+      "sha256": "ea044bd7efe323d77a32e91faa009807efb18ebf83f5620c53a58a40e9cca5f6",
+      "bytes": 9852
+    },
+    "packaging/release-dependencies-v0.1.8.json": {
+      "sha256": "343cfad0bbb4f1c4e104551e4d29aacc15241f365febbd34445e533c47b4a58c",
+      "bytes": 6653
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "2ea68ead349911bb8666fc6dc8198c7e3b965c824893af6b3edc5e1cfe466ee9",
+      "bytes": 418
+    },
+    "runtime/geodata.json": {
+      "sha256": "560db84b14cc9842932553588d88d678c92eb5f8de5d8aabfdfb83e5bd114263",
+      "bytes": 373
+    },
+    "scripts/design-system.cjs": {
+      "sha256": "fa2475466165a4e7c1dbe067d4e2cc51326fe15b21936d77a9956d2bba27a3e5",
+      "bytes": 10471
+    },
+    "scripts/open-preview.ps1": {
+      "sha256": "61fbd2c66c69af25a3c06d66758af2325a1eb7ec735b9244ed2b4880c2a28bd6",
+      "bytes": 1749
+    },
+    "scripts/preview-client.cjs": {
+      "sha256": "b606e146968d358fb75d4bb71c8e7522bb20cfd36594090256e0d6b4010c24f5",
+      "bytes": 4358
+    },
+    "src/atomic-metadata.mjs": {
+      "sha256": "304d85a05916a3b6d2070705defb049cb26289d73b588ce0b1994d5362885a96",
+      "bytes": 5039
+    },
+    "src/automation.mjs": {
+      "sha256": "5155130b1f87b03c8ca41e1592adfe471929813ed0656afdc71d9b6910d045aa",
+      "bytes": 12981
+    },
+    "src/autostart-launch.ps1": {
+      "sha256": "6b2d8ecdc69ab409d3cffe382ca9d267237a08fd1cda2573c748fb2c4c928cda",
+      "bytes": 506
+    },
+    "src/autostart-registry.ps1": {
+      "sha256": "a2f197af7c82175a20fc3bea357f26ae3fce24c0a554568349ccd64b74f1ff13",
+      "bytes": 1309
+    },
+    "src/autostart.mjs": {
+      "sha256": "2d07429bf0f10343ba6dba1b2aa2c97547386f987255720c54da8b0517ed55a6",
+      "bytes": 3250
+    },
+    "src/codex-auto-repair.mjs": {
+      "sha256": "53859deeaf6d2a6d967a80a1322345c99e26f5168fcfc795c34f305ac98d7476",
+      "bytes": 16927
+    },
+    "src/codex-evidence.mjs": {
+      "sha256": "05d2591e5e0973339b6b55086c7418b91a44db9f398ad59571b785142dc26307",
+      "bytes": 12416
+    },
+    "src/codex-health.mjs": {
+      "sha256": "2c81be6674c3a168c160953bb40df92b3088fbe99034baaaf9fcbbe5a04a9f79",
+      "bytes": 3942
+    },
+    "src/codex-proxy-context.mjs": {
+      "sha256": "c5fb7673a7ee7584430625204a1d0e5f3888397a96af26739d07cd5406dec930",
+      "bytes": 4521
+    },
+    "src/codex-repair.mjs": {
+      "sha256": "250b9f49951f16af66bcfa270f27c8f6ce2ebf9602ddb8f5d7e1616328cc5c6d",
+      "bytes": 9616
+    },
+    "src/codex-request.mjs": {
+      "sha256": "21f741f7c00d7bd8622cd8a1403af9ed6e22c3c965f5e3e8d76e8d4029c4b846",
+      "bytes": 4387
+    },
+    "src/codex-target-probe.mjs": {
+      "sha256": "06ed75434f6915599c7c16dc9cfec690fc339ee8168645db3e9681f344c6c4b9",
+      "bytes": 8943
+    },
+    "src/codex-target.mjs": {
+      "sha256": "d87940e3752ae76c30ce820885bf1ff41ee3c60e9d9bb4d911586ba0da7744f4",
+      "bytes": 28626
+    },
+    "src/codex-transport-errors.mjs": {
+      "sha256": "cac649d6f451c803ee7308de4690594d6cab68376b312ed0ee2ccfcf68cd5388",
+      "bytes": 569
+    },
+    "src/config-limits.mjs": {
+      "sha256": "4f9ffc908feb9c6d2470d5d084b01b7e6b2893755a59c4da523f71eac8d8b2e5",
+      "bytes": 129
+    },
+    "src/connection-doctor.mjs": {
+      "sha256": "ad21e90eb6dbb133aea8015e5f914d4b2651d261ffd06f0fdc9d9a49fafb456e",
+      "bytes": 18783
+    },
+    "src/connection-identity.mjs": {
+      "sha256": "a1b9595bbc11baa2d4d81da7b44d112a52a2eaaac47521b4fac9adce523ae3aa",
+      "bytes": 6825
+    },
+    "src/daily-update.mjs": {
+      "sha256": "c1f224ac096dc724901ecd1da98ee19a460698734649ff99a0a03f45e893b61d",
+      "bytes": 6020
+    },
+    "src/desktop.mjs": {
+      "sha256": "3e169eba7fa9c9490c281b8c40db136385fa25f8674dad54a3bcca3bb368a8a5",
+      "bytes": 5943
+    },
+    "src/diagnostics.mjs": {
+      "sha256": "ad848201c6cdb8ede2dc843eba92b62d93b29811ef5ff13a4aa9373bb60dc188",
+      "bytes": 8626
+    },
+    "src/geodata.mjs": {
+      "sha256": "e12775d6056a60fad9c904a883ecb9d16fd9958dc18d3164d5d17f6e627d39f3",
+      "bytes": 4047
+    },
+    "src/health-probe.mjs": {
+      "sha256": "95a425e42d3032d1b73870494376d3b26656fb38b286ed84f07f180c47bfd526",
+      "bytes": 3236
+    },
+    "src/managed-core.mjs": {
+      "sha256": "e98f57617fb550dd211c1d2e0ef0b737dc986622b0882861ab39f5f8da1f2496",
+      "bytes": 16028
+    },
+    "src/mihomo.mjs": {
+      "sha256": "6af4480aaa98c7914ca841f216d7c5ac8d93a41f155b0735f3a3d67d5dc1ca4e",
+      "bytes": 7593
+    },
+    "src/netfix-evidence.mjs": {
+      "sha256": "ae3a4ffaf9f0a3bfab4d4f2177dfd704039324a949529f5ccd39a8a4b49536ec",
+      "bytes": 15116
+    },
+    "src/netfix-legacy-recovery.mjs": {
+      "sha256": "5d2a805fad4e316fc39865f1fc6324b354226f9812572c7d7ba854a3650ea88c",
+      "bytes": 6606
+    },
+    "src/netfix-rules.mjs": {
+      "sha256": "4a819c409f10ecf5b2875b912b1005457daab01f38b3a2e0da153aebd8db51f5",
+      "bytes": 8076
+    },
+    "src/netfix-service.mjs": {
+      "sha256": "08b4e410b1559b3c1b6dd326686f7b63730080abe5b24cc067e07b93d8f18f2b",
+      "bytes": 26206
+    },
+    "src/netfix-transaction.mjs": {
+      "sha256": "b1442b1bba63e01a3ce24bcc1c0ac45993532ad4e1241db8e394b5f7b8a02aed",
+      "bytes": 28265
+    },
+    "src/profiles.mjs": {
+      "sha256": "1a625f4aa4798c2cbee38fb824bfcc3a4ec78dd32698f5e7ae2eb69170a93e43",
+      "bytes": 15662
+    },
+    "src/recovery-assistant.ps1": {
+      "sha256": "85de95efe014decd11662e9fda3a03ca8e6a7b1a40cee781296205bd037e0938",
+      "bytes": 2545
+    },
+    "src/recovery-helper.mjs": {
+      "sha256": "ca4d9c529c2752f91d5d7aec11a25ce7b279b740e3dcf53544c4225743cb17b4",
+      "bytes": 2574
+    },
+    "src/server.mjs": {
+      "sha256": "6d72d373763a758625b26975ef9b13c40b2d5bd3d98c473a1222350596d6b43c",
+      "bytes": 38463
+    },
+    "src/system-proxy.mjs": {
+      "sha256": "7c22dc1e75659f9dd4ec22697685eb8d1b7d90e5259b9084ef94f1b4b3307359",
+      "bytes": 9891
+    },
+    "src/system-proxy.ps1": {
+      "sha256": "4310c27c019f80cac6f5d8ed9e126f8a9379e73c52cd4ce81cc2a0ca1b226b66",
+      "bytes": 2800
+    },
+    "src/theme-preferences.mjs": {
+      "sha256": "99437cc0373c1922f19bf44a37a8254d164fef46b0caadcfe1a8dd7a88f6f1b5",
+      "bytes": 1429
+    },
+    "src/tray.mjs": {
+      "sha256": "8ecb00f411197dcf7c1de1909c90ab41081e2fcdbc364b05d609d0c3f4e2f772",
+      "bytes": 4372
+    },
+    "src/tray.ps1": {
+      "sha256": "7219f6af16b123a7cbcffc2c9b58eee0d164032690b0dddbfe56ad320cfaf85f",
+      "bytes": 1495
+    },
+    "src/update-check.mjs": {
+      "sha256": "911ab3eee493bdb77f611dffb7f2ad1725f943eae5fd2c9763ace95b48fa0bc0",
+      "bytes": 5005
+    },
+    "src/window-host.cs": {
+      "sha256": "42420164237d2e73b2fce8d19b7eaf9e3e49c077c66fc667b2c5c1dac63a0cf7",
+      "bytes": 18897
+    },
+    "Start-Clash-Glass.cmd": {
+      "sha256": "ec07185143b861a2e7360fd2089c051568ddb14d035dec4dc7b10d6d393c05d2",
+      "bytes": 1085
+    },
+    "Start-susu-clash.cmd": {
+      "sha256": "5e9f165ddaaf495f80dd7e3208372b63961912d24a246b0f9400b77e5a3249c5",
+      "bytes": 44
+    },
+    "test/app.test.mjs": {
+      "sha256": "f86a06a66a835c8364f8fb5e63a3a331c47127d0d3aa4e88dad1818f4d3202dc",
+      "bytes": 9113
+    },
+    "test/atomic-metadata.test.mjs": {
+      "sha256": "e386cac9c09cf5b1271ad079fc50baa0ec64345dd97fff31d4cf4a3b56948188",
+      "bytes": 7086
+    },
+    "test/automation.test.mjs": {
+      "sha256": "4899e922d50097bc93fa213a326116a6729143a43857bcb0b2288b4f7a62f880",
+      "bytes": 5726
+    },
+    "test/autostart.test.mjs": {
+      "sha256": "e3fd8ae36286d1f030e7acbb5ddbed447edd7e6ecabd3e3e83802267fbf230e0",
+      "bytes": 2160
+    },
+    "test/codex-auto-repair.test.mjs": {
+      "sha256": "99d7fa08f23f8db4530616b89a7ab61a6563d349bb1b2e5789e2e4df828abdbc",
+      "bytes": 16029
+    },
+    "test/codex-auto-review.test.mjs": {
+      "sha256": "5fba3b0b4877660a6528123351629c93ee10d2f4ddf93de0b87b477138a2f461",
+      "bytes": 4256
+    },
+    "test/codex-evidence.test.mjs": {
+      "sha256": "69ced0ca7a02264c74e9ade04901ff3067c6289dfb54bf4b793541c65b981e48",
+      "bytes": 14310
+    },
+    "test/codex-health.test.mjs": {
+      "sha256": "4e7d53c3f9598c987947ab8e7a24c9599ebd23613da57d2041e50dcd33ac1daa",
+      "bytes": 2941
+    },
+    "test/codex-proxy-context.test.mjs": {
+      "sha256": "54b1ca1b08c50daab46803e5210e6b90fe07fa273c21433f3385c0d42aa61f5e",
+      "bytes": 6159
+    },
+    "test/codex-proxy-repair.test.mjs": {
+      "sha256": "a0ff92a81cf5ec0fc426589f6982ebfaad8e6d1e645dbea739f8c671aea1c7ad",
+      "bytes": 18061
+    },
+    "test/codex-repair.test.mjs": {
+      "sha256": "5f2b80b59b8c92d6b1cfe9e33dc4b834b547dc9eb9fafdb0a069387f3e0e6510",
+      "bytes": 6247
+    },
+    "test/codex-request.test.mjs": {
+      "sha256": "ae7456a19e3232931e9ad0f34cb5a9f7a98437476152ca16da001a317bdd29f7",
+      "bytes": 2605
+    },
+    "test/codex-target.test.mjs": {
+      "sha256": "bb8dfaf840991b069c726bd5764c4b9ea26269a01055357f0d3b698e4b46f96e",
+      "bytes": 23242
+    },
+    "test/connection-doctor.test.mjs": {
+      "sha256": "db31ce39c7c6f01791dc0f92f60559f26b9e99343f74091afab3c8b97843ba87",
+      "bytes": 12576
+    },
+    "test/connection-identity.test.mjs": {
+      "sha256": "ea4a01146dfab7d53b7144e503fe80e0dbe457e178eb020df368a88521496dcd",
+      "bytes": 12873
+    },
+    "test/daily-update.test.mjs": {
+      "sha256": "3effb96cbb8ab8b92c3679ffc1c5f6da8589b95b6d75276a3fbf17068bde049d",
+      "bytes": 9891
+    },
+    "test/design-system.test.mjs": {
+      "sha256": "d279f45c7c1f500d0ef2513f040ec07da33d8debf19ba7b1a6a49809ecbebd35",
+      "bytes": 2140
+    },
+    "test/doctor-api.test.mjs": {
+      "sha256": "47585b94701545fba096516b75de290fc6e62a391b1cd421e87f11eea73de8c2",
+      "bytes": 3817
+    },
+    "test/doctor-auto-api.test.mjs": {
+      "sha256": "b63a8e53ea3e1218d8bdbdada8fd693fac320d110d2804e2ae168ae97371eda4",
+      "bytes": 5239
+    },
+    "test/geodata.test.mjs": {
+      "sha256": "4db202ce76150c0330cd3016c0a7fef5b75d1f061871d131cb750130709b98c0",
+      "bytes": 4638
+    },
+    "test/geosite-compat.test.mjs": {
+      "sha256": "80f88270ea8806d70b609ae8d6fed31b4bede7c255b34ed6ad4348229b1ea3e7",
+      "bytes": 3441
+    },
+    "test/health-probe.test.mjs": {
+      "sha256": "74368ca3ab3668b23aacfe0a89295a00a683dfb38dd4657b812806ddd57dd6c0",
+      "bytes": 1654
+    },
+    "test/managed-core.test.mjs": {
+      "sha256": "51828c46965c29a19d57ad23154ecfd9afebed4a5a47919326e993b0987e70a8",
+      "bytes": 7317
+    },
+    "test/netfix-api-integration.test.mjs": {
+      "sha256": "5f55ddd15dce015389f2e7876a63c5af9fbd2e8bf61f994f2bed5aac5e48b431",
+      "bytes": 6289
+    },
+    "test/netfix-legacy-recovery.test.mjs": {
+      "sha256": "3853a9f97828fcf7fbfcf6d9907d1f1a5b4979fe61c2ab88fe43ab1d9d57235c",
+      "bytes": 5148
+    },
+    "test/netfix-windows.test.mjs": {
+      "sha256": "e155d12080b7952fad75f48827136c1489836cbf56c151433cff4bd92bd2e43b",
+      "bytes": 3860
+    },
+    "test/netfix.test.mjs": {
+      "sha256": "b8e7413f0e5e6f590ed9f809f7724ba980b97b13edc7fcad17980d903cdc3534",
+      "bytes": 41378
+    },
+    "test/profiles.test.mjs": {
+      "sha256": "df552ed10c241f7867700aee05c9a07f88813da178bb3a0f9524baa25421fa70",
+      "bytes": 14070
+    },
+    "test/recovery-helper.test.mjs": {
+      "sha256": "fe2c983849acd0292383f9252f58c508950669acada00068b350ac25cf1d734a",
+      "bytes": 2594
+    },
+    "test/standalone-api.test.mjs": {
+      "sha256": "f13ac1e037129ddcb8f643fc25d45f797f92844d18f7302d49fd7d1b0ab24150",
+      "bytes": 9153
+    },
+    "test/subscription-usage.test.mjs": {
+      "sha256": "07b043cd771318e09d119349a5fabe26191adf42ffa3e5139f46e90714621273",
+      "bytes": 2760
+    },
+    "test/system-proxy-api.test.mjs": {
+      "sha256": "6f7653608a98ae2f2e0cde12e81776a72952e247ea58be08dcbd03ed9c04d9d9",
+      "bytes": 6660
+    },
+    "test/system-proxy.test.mjs": {
+      "sha256": "e6d06ca267e7d675f456ce60dbf426b4e84fd01642bd768c951225d398a181bf",
+      "bytes": 13244
+    },
+    "test/theme-preferences.test.mjs": {
+      "sha256": "7e911e10cf4467f2fc98ce61dfc401ef27d81208286781909a5715c4b79e6b66",
+      "bytes": 3839
+    },
+    "test/tray.test.mjs": {
+      "sha256": "d2cca32d52f5800fd3d8f34f8e3d7842c5e3d849eb5b8575b19fbb517e34a559",
+      "bytes": 5050
+    },
+    "test/update-check.test.mjs": {
+      "sha256": "e61899a21724098575d1d30ae5860e172eeb9e6bf2f8eef72ef68dde4d6e4032",
+      "bytes": 6269
+    },
+    "test/window-host.test.mjs": {
+      "sha256": "67af62177fdb95e89291aa85c0b80c1b4157db48f35b556a990e15ed3e8d87a6",
+      "bytes": 2538
+    },
+    "恢复SusuClash.cmd": {
+      "sha256": "f05c817e37e03de932661bcc9c40cf08ad0f977a3ecb020ffda21953549f0d75",
+      "bytes": 316
+    },
+    "打开交互预览.cmd": {
+      "sha256": "d366365a2e39f1f267458aeec1a609ea23a240188610ee6815ba3bb540dc1953",
+      "bytes": 173
+    }
+  }
+}

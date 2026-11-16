@@ -38,3 +38,20 @@ test('theme API saves only valid choices and serves the integrated page assets',
     assert.deepEqual(await (await get('api/theme')).json(),{theme:'fish'});
   } finally {await app.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('production entry serves every referenced style and script without exposing preview files', async () => {
+  const core={preferences:async()=>({expectedPort:7890}),call:async()=>({})};
+  const app=await startServer({core,readSystemProxy:async()=>false});
+  try {
+    const html=await (await fetch(app.url)).text();
+    const files=[...html.matchAll(/(?:src|href)="([^"/]+\.(?:css|js))"/g)].map(match=>match[1]);
+    for(const asset of ['design-system.css','visual-contract.css','visual-contract.js']) assert(files.includes(asset));
+    for(const asset of files){
+      const response=await fetch(app.url+asset);
+      assert.equal(response.status,200,asset);
+      assert.match(response.headers.get('content-type'),asset.endsWith('.css')?/^text\/css/:/^application\/javascript/);
+      assert.equal(await response.text(),await readFile(new URL('../app/'+asset,import.meta.url),'utf8'),asset);
+    }
+    for(const asset of ['__preview/bridge.js','preview-bridge.js','package.json','.env']) assert.equal((await fetch(app.url+asset)).status,404,asset);
+  }finally{await app.close()}
+});

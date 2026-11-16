@@ -1,5 +1,6 @@
+import {prepareClientRestart} from './recovery-helper.mjs';
 import { spawn } from 'node:child_process';
-import { access, mkdtemp, realpath, rm } from 'node:fs/promises';
+import { access, mkdtemp, realpath, rm, mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,7 +79,7 @@ async function main() {
   let session;
   try {
     session = createDesktopSession({
-      startServerFn:startServer, preferences, trayFactory:createTray,
+      startServerFn:async options=>{const app=await startServer({...options,restartClient:async()=>{const ready=await prepareClientRestart(defaultDataDir);setTimeout(()=>void session.shutdown(),500);return ready;}});await mkdir(defaultDataDir,{recursive:true});await writeFile(path.join(defaultDataDir,'recovery-session.json'),JSON.stringify({pid:process.pid,node:process.execPath,url:app.url,startedAt:new Date(Date.now()-process.uptime()*1000).toISOString()}),{mode:0o600});return app;}, preferences, trayFactory:createTray,
       // The executable is a GUI binary, so no console is created. Do not set
       // windowsHide here: that can hide its actual top-level window.
       openWindow:url => spawn(windowHost, [url, profile, String(process.pid)], {stdio:'ignore'}),

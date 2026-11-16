@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "geosite": {
+    "sha256": "85073a00a3c3eb80ac76b97df2f97f7dab00cb36c8b5e7ed2354cbd016f8b088",
+    "replaces": ["dc4192dd1b644a38276ed06136d26e729fa674d25785adb38c87e040e92376b2"],
+    "source": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
+    "assetId": 725861463,
+    "publishedAt": "2026-11-09T01:50:54Z"
+  }
+}

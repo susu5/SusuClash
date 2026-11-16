@@ -7,6 +7,7 @@ if defined CLASH_GLASS_NODE (
   "%CLASH_GLASS_NODE%" -e "process.exit(Number(process.versions.node.split('.')[0])>=22?0:1)" >nul 2>&1
   if errorlevel 1 set "CLASH_GLASS_NODE="
 )
+if not defined CLASH_GLASS_NODE if exist "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" set "CLASH_GLASS_NODE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 if not defined CLASH_GLASS_NODE (
   echo Node.js 22 or newer is required.
   pause

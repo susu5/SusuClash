@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {createConnectionDoctor} from './connection-doctor.mjs';
 import net from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -7,20 +8,31 @@ import { AppError, createMihomo, modes, portNumber, probeUrl, routingGroups, sel
 import { diagnose, systemProxyEnabled } from './diagnostics.mjs';
 import { createManagedCore } from './managed-core.mjs';
 import { createProfileStore, ProfileError } from './profiles.mjs';
-import { createSystemProxy } from './system-proxy.mjs';
+import { createSystemProxy, ProxyError } from './system-proxy.mjs';
 import { createAutomation } from './automation.mjs';
 import { createHealthProbe, targets as healthTargets } from './health-probe.mjs';
 import { createAutostart } from './autostart.mjs';
 import { createTrayPreferences } from './tray.mjs';
 import { createCodexHealth, codexTarget } from './codex-health.mjs';
-import { createCodexRepair } from './codex-repair.mjs';
+import { createNetfixService } from './netfix-service.mjs';
+import { createNetfixLegacyRecovery } from './netfix-legacy-recovery.mjs';
+import { createCodexTargetAdapter } from './codex-target.mjs';
 import { createThemePreferences } from './theme-preferences.mjs';
 import { createUpdateChecker } from './update-check.mjs';
 import { createDailyUpdate } from './daily-update.mjs';
+import { createConnectionIdentity } from './connection-identity.mjs';
 
 const appVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const assets = {
+  'design-system.css': ['design-system.css', 'text/css; charset=utf-8'],
+  'visual-contract.css': ['visual-contract.css', 'text/css; charset=utf-8'],
+  'visual-contract.js': ['visual-contract.js', 'application/javascript; charset=utf-8'],
+  'doctor.js':['doctor.js','application/javascript; charset=utf-8'],
+  'doctor.css':['doctor.css','text/css; charset=utf-8'],
+  'netfix.js':['netfix.js','application/javascript; charset=utf-8'],
+  'netfix.css':['netfix.css','text/css; charset=utf-8'],
+  'visual-polish.css':['visual-polish.css','text/css; charset=utf-8'],
   '': ['index.html', 'text/html; charset=utf-8'],
   'app.css': ['app.css', 'text/css; charset=utf-8'],
   'app.js': ['app.js', 'application/javascript; charset=utf-8'],
@@ -36,7 +48,6 @@ const assets = {
   'window-frame.js': ['window-frame.js', 'application/javascript; charset=utf-8'],
   'update-check.css': ['update-check.css', 'text/css; charset=utf-8'],
   'update-check.js': ['update-check.js', 'application/javascript; charset=utf-8'],
-  'codex-repair.js': ['codex-repair.js', 'application/javascript; charset=utf-8'],
   'cat-motion.gif': ['cat-motion.gif', 'image/gif'],
   'fish-motion.gif': ['fish-motion.gif', 'image/gif'],
   'whale-motion.gif': ['whale-motion.gif', 'image/gif'],
@@ -100,14 +111,11 @@ function connectionItems(snapshot) {
   return Array.isArray(snapshot.connections) ? snapshot.connections : null;
 }
 
-function connectionSummary(snapshot) {
-  const connections = connectionItems(snapshot);
+function connectionSummary(snapshot, connections = connectionItems(snapshot)) {
   if (!connections) return null;
   const byApp = new Map();
   for (const item of connections) {
-    const metadata = item?.metadata ?? {};
-    const file = metadata.process || metadata.processPath;
-    const name = typeof file === 'string' && file ? path.win32.basename(file).slice(0, 120) : '未知进程';
+    const name = item.app || '未知应用';
     const app = byApp.get(name) ?? { name, active: 0, downloaded: 0, uploaded: 0 };
     app.active++;
     app.downloaded += count(item?.download) ?? 0;
@@ -127,9 +135,8 @@ async function httpProviders(core) {
   return Object.entries(response?.providers ?? {}).filter(([, data]) => data?.vehicleType === 'HTTP').map(([name]) => name);
 }
 
-export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, codexRepairService, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, dailyUpdate, automationIntervalMs = 5000 } = {}) {
+export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, netfixService, netfixOptions = {}, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, dailyUpdate, automationIntervalMs = 5000, connectionDoctor, doctorSystem, restartClient, codexTargetAdapter, connectionIdentity = createConnectionIdentity() } = {}) {
   const managed = typeof core.applyConfig === 'function';
-  const codexRepair = codexRepairService || createCodexRepair({core});
   const profiles = profileStore || (managed ? createProfileStore({ directory: path.join(core.directory, 'profiles'), validateConfig: core.validateConfig, applyConfig: core.applyConfig }) : null);
   const proxy = systemProxy || (managed ? createSystemProxy({ directory: core.directory }) : null);
   const startup = autostart || (managed ? createAutostart() : null);
@@ -150,6 +157,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   let origin;
   let pendingCheck;
   let writing = false;
+  let doctor;
+  let netfix = netfixService || null;
   let writeTail = Promise.resolve();
   let closing = false;
   let closePromise = null;
@@ -166,10 +175,11 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   logEvent('info', '客户端已启动');
   let restoring = null;
   let recoveryWarning = null;
+  let proxyRecoveryFailed = false;
   if (profiles && managed) {
     restoring = (async () => {
       try { if (proxy) await proxy.restoreOnExit(); }
-      catch { recoveryWarning = '上次异常退出后，系统代理恢复失败。请先检查 Windows 代理设置。'; return; }
+      catch { proxyRecoveryFailed = true; recoveryWarning = '上次异常退出后，系统代理恢复失败。请先检查 Windows 代理设置。'; return; }
       try { await profiles.restoreActive(); }
       catch { recoveryWarning = '无法恢复上次配置，请检查内核和配置。'; }
     })().finally(() => { restoring = null; });
@@ -209,7 +219,7 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   }
   function mutation(action, manual = true) {
     if (closing) throw new AppError('客户端正在退出，暂时不能更改设置。', 503);
-    if (manual) automation?.invalidate();
+    if (manual) { if((doctor?.isRepairing() || netfix?.isRepairing()))throw new AppError('修复步骤正在完成，请等待复查后再更改连接设置。',409); automation?.invalidate(); invalidateChecks(); }
     const task = writeTail.then(async () => {
       writing = true;
       try { return await action(); }
@@ -280,6 +290,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
             const encoded = await selectableMember(core, observation.group, observation.current);
             const group = await core.call('GET', '/proxies/' + encoded);
             if (signal.aborted || !isCurrent() || group?.now !== observation.current) return {ok:false};
+            if((doctor?.isRepairing() || netfix?.isRepairing()))return {ok:false};
+            invalidateChecks('后台已重新应用线路，请重新检查连接。');
             await core.call('PUT', '/proxies/' + encoded, {name:observation.current});
             if (signal.aborted || !isCurrent()) return {ok:false};
             logEvent('info', '已尝试重新应用当前线路');
@@ -289,7 +301,7 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
         if (problem !== 'core') return {ok:false};
         return mutation(async () => {
           if (signal.aborted || !isCurrent()) return {ok:false};
-          try { await core.start(); logEvent('info', '已尝试自动重启内核'); return {ok:true}; }
+          try { if((doctor?.isRepairing() || netfix?.isRepairing()))return {ok:false};invalidateChecks('后台正在恢复内核，请重新检查连接。');await core.stop();await core.start(); logEvent('info', '已尝试自动重启内核'); return {ok:true}; }
           catch { logEvent('error', '自动重启内核失败'); return {ok:false}; }
         }, false);
       },
@@ -298,6 +310,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
         if (signal.aborted || !isCurrent() || (await profiles.list()).activeId !== scope || group !== monitorGroup) throw new AppError('自动处理已取消。', 409);
         const encoded = await selectableMember(core, group, node);
         if (signal.aborted || !isCurrent()) throw new AppError('自动处理已取消。', 409);
+        if((doctor?.isRepairing() || netfix?.isRepairing()))throw new AppError('连接修复正在完成，暂停后台换线。',409);
+        invalidateChecks('后台已切换备用线路，请重新检查连接。');
         await core.call('PUT', '/proxies/' + encoded, {name:node});
         logEvent('info', '已尝试自动切换备用节点');
       }, false)
@@ -326,10 +340,45 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     ]);
     const current = publicConfig(config);
     if (!writing && current.mode && current.mode !== 'direct') resumeMode = current.mode;
-    return { ...current, ...identity, resumeMode, sampledAt: Date.now(), connections: connectionSummary(snapshot) };
+    const items = connectionItems(snapshot);
+    return { ...current, ...identity, resumeMode, sampledAt: Date.now(), connections: connectionSummary(snapshot, items && connectionIdentity.known(items)) };
   }
 
+  function invalidateChecks(reason) { doctor?.invalidate(reason); netfix?.invalidate(reason); }
+  const retiredCodex = () => { throw new AppError('Codex 专项已改用 Netfix，请重新进入网络修复工具箱。', 410); };
+  async function connectionConfiguration() {
+    return {runtime:core.status?.().state,config:await core.call('GET','/configs').then(publicConfig,()=>null),proxy:await proxy?.getStatus(),profile:(await profiles?.list())?.activeId,groups:await core.call('GET','/proxies').then(r=>routingGroups(r,'rule').map(g=>({name:g.name,current:g.current})),()=>[]),automation:await automationStatus().then(a=>({scope:a.scope,group:a.group,backups:a.backups}))};
+  }
+  function getNetfix() {
+    if (!netfix) {
+      const directory = Object.hasOwn(netfixOptions,'directory') ? netfixOptions.directory : managed ? process.env.CODEX_HOME || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE,'.codex') : null) : null;
+      const legacyAdapter = codexTargetAdapter || createCodexTargetAdapter({home:directory});
+      const legacyRecover = netfixOptions.legacyRecover || createNetfixLegacyRecovery({directory:managed?core.directory:null,core,configuration:connectionConfiguration,recoverTransport:()=>legacyAdapter.recover?.() || {ok:true}});
+      netfix = createNetfixService({...netfixOptions,directory,stateDirectory:managed?core.directory:null,legacyRecover,
+        serialize:fn=>{automation?.invalidate();return mutation(async()=>{if(restoring)await restoring;doctor?.invalidate('Codex 配置正在处理，请重新检查连接。');return fn();},false);}
+      });
+    }
+    return netfix;
+  }
+  async function netfixAction(method,input) {
+    if(closing)throw new AppError('客户端正在退出，请等待恢复完成。',503);
+    if(!['get','cancel'].includes(method)&&doctor?.isRepairing())throw new AppError('代理修复正在完成，请等待复查。',409);
+    try {return await getNetfix()[method](input);}
+    catch(error){if(error instanceof AppError)throw error;if([400,409,410,503].includes(error?.status))throw new AppError(error.message,error.status);throw error;}
+  }
+  function baseAction(method,input) {
+    if(closing)throw new AppError('客户端正在退出，请等待恢复完成。',503);
+    if(netfix?.isRepairing())throw new AppError('Codex 配置正在处理，请等待恢复或复查。',409);
+    return doctor[method](input);
+  }
+  doctor = connectionDoctor || createConnectionDoctor({core,proxy,profiles,health:healthProbe || (core.call?createHealthProbe({core}):{verify:async()=>'unknown'}),directory:managed?core.directory:null,system:doctorSystem,restartClient,
+    configuration:connectionConfiguration,
+    serialize:fn=>{automation?.invalidate();netfix?.invalidate('代理连接设置正在处理，请重新诊断。');return mutation(fn,false);}
+  });
+  if(managed)void readFile(path.join(core.directory,'restart-receipt.json'),'utf8').then(async raw=>{const receipt=JSON.parse(raw);if(receipt.source==='independent-helper'&&receipt.needsRecheck&&Date.now()-Date.parse(receipt.at)<120000){if(restoring)await restoring;await doctor.start();await rm(path.join(core.directory,'restart-receipt.json'),{force:true});}}).catch(()=>{});
   const reads = {
+    doctor:()=>doctor.get(),
+    netfix:()=>netfixAction('get'),
     'update-check': async () => daily ? daily.checkNow() : updates.check(),
     'update-settings': async () => daily ? daily.get() : {enabled:false,lastCheckedAt:null,nextCheckAt:null,lastResult:null,checking:false,error:'自动检查不可用。'},
     theme: async () => theme ? theme.get() : {theme:'cat'},
@@ -342,15 +391,20 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     profiles: async () => profiles ? profiles.list() : { activeId: null, profiles: [] },
     'system-proxy': async () => proxy ? proxy.getStatus() : { enabled: await readSystemProxy(), managed: false },
     async connections() {
-      const snapshot = await core.call('GET', '/connections');
+      const [snapshot, config] = await Promise.all([
+        core.call('GET', '/connections'), core.call('GET', '/configs').catch(() => null)
+      ]);
       const connections = connectionItems(snapshot);
       if (!connections) throw new AppError('连接数据暂不可用。', 503);
-      return { downloaded: count(snapshot.downloadTotal), uploaded: count(snapshot.uploadTotal), connections: connections.map(item => {
+      const identified = await connectionIdentity.identify(connections, {
+        proxyPorts: [config?.['mixed-port'], config?.port, config?.['socks-port']],
+        recheck: async () => connectionItems(await core.call('GET', '/connections'))
+      });
+      return { downloaded: count(snapshot.downloadTotal), uploaded: count(snapshot.uploadTotal), connections: identified.map(item => {
         const meta = item?.metadata ?? {};
-        const filename = meta.process || meta.processPath;
         const host = meta.host || meta.destinationIP || '未知地址';
         const port = meta.destinationPort ? ':' + meta.destinationPort : '';
-        return { id: typeof item.id === 'string' ? item.id : '', app: typeof filename === 'string' && filename ? path.win32.basename(filename).slice(0,120) : '未知应用',
+        return { id: typeof item.id === 'string' ? item.id : '', app: item.app, processSource: item.processSource,
           address: String(host).slice(0,256) + port, route: Array.isArray(item.chains) ? item.chains.filter(x => typeof x === 'string').join(' → ').slice(0,400) : '未知',
           startedAt: typeof item.start === 'string' ? item.start : null, upload: count(item.upload), download: count(item.download) };
       }).filter(item => item.id) };
@@ -367,6 +421,18 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     }
   };
   const writes = {
+    'doctor/start':input=>input?.scope==='codex'?retiredCodex():baseAction('start',input),
+    'doctor/auto-start':retiredCodex,
+    'doctor/cancel':()=>doctor.cancel(),
+    'doctor/invalidate':async()=>{invalidateChecks('网络环境已变化，请重新检查。');return doctor.get();},
+    'doctor/preview':input=>input?.kind==='codex-port'?retiredCodex():baseAction('preview',input),
+    'doctor/apply':input=>baseAction('apply',input),
+    'doctor/request':retiredCodex,
+    'doctor/confirm':retiredCodex,
+    'netfix/diagnose':input=>netfixAction('diagnose',input),
+    'netfix/preview':input=>netfixAction('preview',input),
+    'netfix/apply':input=>netfixAction('apply',input),
+    'netfix/cancel':()=>netfixAction('cancel'),
     'update-settings': input => mutation(async()=>{
       if(!daily || typeof input.enabled!=='boolean') throw new AppError('自动检查设置不可用。',400);
       return daily.set({enabled:input.enabled});
@@ -375,8 +441,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       if (!theme || !['cat','fish','whale'].includes(input?.theme)) throw new AppError('主题设置不可用。', 400);
       return theme.set({theme:input.theme});
     }, false),
-    'codex-repair/preview': () => mutation(() => codexRepair.preview()),
-    'codex-repair/apply': input => mutation(() => codexRepair.apply(input.token)),
+    'codex-repair/preview':retiredCodex,
+    'codex-repair/apply':retiredCodex,
     tray: input => mutation(async () => {
       if (!tray || typeof input.closeToTray !== 'boolean') throw new AppError('托盘设置不可用。', 400);
       if ((await tray.get()).available !== true) throw new AppError('系统托盘尚不可用，关闭窗口将退出。', 409);
@@ -433,6 +499,7 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     'core-start': () => mutation(async () => { if (!managed) throw new AppError('内核控制不可用。', 503); if (restoring) await restoring; return tracked(() => core.start(), '内核已启动', '内核启动失败'); }),
     'core-stop': () => mutation(async () => {
       if (!managed) throw new AppError('内核控制不可用。', 503);
+      if (restoring) await restoring;
       if (proxy) await proxy.restoreOnExit();
       await core.stop();
       logEvent('info', '内核已停止');
@@ -440,10 +507,21 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     }),
     'system-proxy': input => mutation(async () => {
       if (!proxy || typeof input.enabled !== 'boolean') throw new AppError('系统代理设置不可用。', 400);
-      if (!input.enabled) { await proxy.disable(); return proxy.getStatus(); }
-      const config = publicConfig(await core.call('GET', '/configs'));
-      if (!config.port) throw new AppError('代理端口尚未就绪。', 409);
-      return proxy.enable(config.port);
+      if (restoring) await restoring;
+      return tracked(async () => {
+        let status;
+        if (!input.enabled) { await proxy.disable(); status = await proxy.getStatus(); }
+        else {
+          const config = publicConfig(await core.call('GET', '/configs'));
+          if (!config.port) throw new AppError('代理端口尚未就绪。', 409);
+          status = await proxy.enable(config.port);
+        }
+        if (proxyRecoveryFailed && (status.managed || !status.recoveryAvailable)) {
+          proxyRecoveryFailed = false;
+          recoveryWarning = null;
+        }
+        return status;
+      }, input.enabled ? '系统代理已开启并回读确认' : '系统代理恢复操作已完成', '系统代理更改失败');
     }),
     disconnect: input => mutation(async () => {
       if (typeof input.id !== 'string' || !input.id || input.id.length > 200) throw new AppError('请选择有效连接。', 400);
@@ -514,8 +592,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       }
     } catch (error) {
       if (!res.headersSent && !res.destroyed) {
-        json(res, error instanceof AppError || error instanceof ProfileError ? error.status : 500, {
-          error: error instanceof AppError || error instanceof ProfileError ? error.message : '操作失败，请检查本地状态后重试。'
+        json(res, error instanceof AppError || error instanceof ProfileError || error instanceof ProxyError ? error.status : 500, {
+          error: error instanceof AppError || error instanceof ProfileError || error instanceof ProxyError ? error.message : '操作失败，请检查本地状态后重试。'
         });
       }
     }
@@ -538,6 +616,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       daily?.stop();
       closePromise = (async () => {
         if (automation?.stop) await automation.stop();
+        await netfix?.close();
+        await doctor?.close();
         await writeTail;
         if (restoring) await restoring;
         if (proxy) await proxy.restoreOnExit();
