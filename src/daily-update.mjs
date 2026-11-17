@@ -1,7 +1,7 @@
-import {randomBytes} from 'node:crypto';
-import {mkdir, readFile, rename, rm, writeFile} from 'node:fs/promises';
+import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {RELEASE_PAGE} from './update-check.mjs';
+import {readMetadataSnapshot,writeAtomicMetadata} from './atomic-metadata.mjs';
 
 const DAY=24*60*60*1000;
 const statuses=new Set(['available','up_to_date','unreleased','invalid_release','network_error','timeout','service_error','rate_limited']);
@@ -10,11 +10,12 @@ const validVersion = value => typeof value==='string' && /^(?:0|[1-9]\d{0,5})\.(
 // Only non-sensitive update preferences and sanitized release status are stored.
 // A failed storage operation never enables an automatic network request.
 export function createDailyUpdate({directory,checker,currentVersion,now=()=>Date.now(),intervalMs=DAY,
-  setTimer=setTimeout,clearTimer=clearTimeout,waitUntilReady=async()=>{}}={}) {
+  setTimer=setTimeout,clearTimer=clearTimeout,waitUntilReady=async()=>{},system={}}={}) {
   if(!directory || !checker || typeof checker.check!=='function' || !validVersion(currentVersion)) throw new TypeError('invalid update service configuration');
   if(!Number.isFinite(intervalMs) || intervalMs<1) throw new TypeError('invalid interval');
   const file=path.join(directory,'application-update.json');
   let state={enabled:true,lastCheckedAt:null,lastResult:null}, storageError=null, started=false, schedulerReady=false, stopped=false, timer=null, pending=null, tail=Promise.resolve();
+  let metadataFingerprint;
   function sanitize(value) {
     if(!value || !statuses.has(value.status)) return null;
     const current=validVersion(value.currentVersion)?value.currentVersion:null;
@@ -24,7 +25,10 @@ export function createDailyUpdate({directory,checker,currentVersion,now=()=>Date
   }
   const ready=(async()=>{
     try {
-      const parsed=JSON.parse(await readFile(file,'utf8'));
+      const snapshot=await readMetadataSnapshot(file,{maxBytes:65536});
+      metadataFingerprint=snapshot.fingerprint;
+      if(snapshot.bytes===null)return;
+      const parsed=JSON.parse(snapshot.bytes.toString('utf8'));
       if(!parsed || typeof parsed.enabled!=='boolean' || !(parsed.lastCheckedAt===null || (typeof parsed.lastCheckedAt==='string' && Number.isFinite(Date.parse(parsed.lastCheckedAt))))) throw Error('invalid data');
       const lastResult=parsed.lastResult===null?null:sanitize(parsed.lastResult);
       // A new installed version should get a fresh check instead of displaying
@@ -38,9 +42,10 @@ export function createDailyUpdate({directory,checker,currentVersion,now=()=>Date
   function serial(fn) { const next=tail.then(()=>ready).then(fn);tail=next.catch(()=>{});return next; }
   async function save(next) {
     await mkdir(directory,{recursive:true});
-    const temporary=file+'.'+randomBytes(8).toString('hex')+'.tmp';
-    try {await writeFile(temporary,JSON.stringify(next),{flag:'wx',mode:0o600});await rename(temporary,file);}
-    finally {await rm(temporary,{force:true}).catch(()=>{});}
+    if(metadataFingerprint===undefined)throw Error('update_metadata_unreadable');
+    const saved=await writeAtomicMetadata(file,JSON.stringify(next),{expected:metadataFingerprint,
+      renameMetadata:system.renameMetadata,hook:system.metadataHook,maxBytes:65536});
+    metadataFingerprint=saved.fingerprint;
   }
   function delay() {
     const previous=state.lastCheckedAt ? Date.parse(state.lastCheckedAt) : null;

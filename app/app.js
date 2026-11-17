@@ -23,8 +23,8 @@ function currentDetail() { return ui.profiles.find(p => p.id === ui.profile); }
 function unavailable(button, reason) { button.disabled = true; button.title = reason; button.setAttribute('aria-description', reason); }
 function openPage(name, discard = false) {
   if (!discard && ui.page === 'subscriptionForm' && name !== 'subscriptionForm' && JSON.stringify([$('subName').value,$('subUrl').value]) !== ui.formInitial) { ui.formPendingPage=name; $('subDiscardDialog').showModal(); return; }
-  if (!discard && ui.page === 'backups' && name !== 'backups' && JSON.stringify(ui.backupDraft) !== JSON.stringify(ui.automation?.backups || [])) { ui.pendingPage=name; $('discardDialog').showModal(); return; }
-  if (name === 'backups' && ui.page !== 'backups') { ui.backupDraft=ui.automation?.group===currentGroup()?.name ? [...(ui.automation?.backups || [])] : []; renderBackupEditor(); }
+  if (!discard && ui.page === 'backups' && name !== 'backups' && backupDraftChanged()) { ui.pendingPage=name; $('discardDialog').showModal(); return; }
+  if (name === 'backups' && ui.page !== 'backups') startBackupEditor();
   if (name === 'subscriptionForm' && ui.page !== 'subscriptionForm') ui.formInitial=JSON.stringify([$('subName').value,$('subUrl').value]);
   ui.page = name;
   pages.forEach(p => { p.hidden = p.dataset.page !== name; });
@@ -155,15 +155,117 @@ function renderAutomation() {
   const checks=[['core','代理内核'],['port','代理端口'],['network','本机网络'],['node','当前线路'],['codex','Codex 连接']];
   $('autoChecks').replaceChildren(...checks.map(([key,label])=>{const row=el('div','row');const state=a?.checks?.[key];const result=el('span','result',state==='ok'?'正常':state==='failed'?(a?.phase==='confirming'?'待确认':'异常'):'未知');result.dataset.tone=state==='ok'?'ok':state==='failed'?'warn':'';const copy=el('span','row-copy');copy.append(el('span','row-label',label));if(key==='codex'){const checked=a?.codexCheckedAt?new Date(a.codexCheckedAt):null;const detail=[a?.codexDetail,checked && Number.isFinite(checked.getTime())?'最近检查：'+checked.toLocaleString('zh-CN',{hour12:false}):'最近检查：暂无'].filter(Boolean).join(' · ');copy.append(el('span','hint',detail));}row.append(copy,result);return row;}));
 }
-function renderBackupEditor(focusName) {
-  const group=currentGroup();set('backupGroupLabel',group?'策略组 · '+group.name:'暂无策略组');
-  set('draftCount','已选 '+ui.backupDraft.length+' 个'+(JSON.stringify(ui.backupDraft)!==JSON.stringify(ui.automation?.backups||[])?' · 未保存':''));
-  const list=$('backupList');list.replaceChildren();
-  if(!ui.backupDraft.length) list.append(el('p','empty-state','还没有备用节点，从下方添加。'));
-  ui.backupDraft.forEach((name,i)=>{const row=el('div','backup-row');row.dataset.name=name;const copy=el('span','row-copy');copy.append(el('span','row-label',name));if(name===group?.current)copy.append(el('span','hint','当前线路，切换时跳过'));else if(!group?.members?.some(m=>m.name===name))copy.append(el('span','hint','已失效，切换时跳过'));const actions=el('div','order-actions');const remove=el('button');remove.type='button';remove.dataset.remove=name;remove.setAttribute('aria-label','移除 '+name);remove.innerHTML='<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';const handle=el('button','drag-handle');handle.type='button';handle.dataset.name=name;handle.setAttribute('aria-label','排序 '+name+'，按住拖动或使用上下方向键');handle.innerHTML='<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 7h8M8 12h8M8 17h8"/></svg>';actions.append(remove,handle);row.append(el('span','order-badge',i+1),copy,actions);list.append(row);});
-  const available=(group?.members||[]).map(member=>{const b=el('button','available-node');b.type='button';b.dataset.add=member.name;b.disabled=member.name===group.current||ui.backupDraft.includes(member.name);b.append(el('span','row-copy row-label',member.name),el('span','add-label',member.name===group.current?'当前线路':ui.backupDraft.includes(member.name)?'已添加':'添加'));return b;});
-  $('availableNodes').replaceChildren(...(available.length?available:[el('p','empty-state','暂无可选线路。')]));
-  if(focusName) [...list.querySelectorAll('.drag-handle')].find(b=>b.dataset.name===focusName)?.focus({preventScroll:true});
+const backupLimit = 64;
+function backupDraftChanged() { return JSON.stringify(ui.backupDraft) !== JSON.stringify(ui.backupContext?.baseline || []); }
+function startBackupEditor() {
+  const group=currentGroup(), scope=currentProfile()?.id || '';
+  const baseline=ui.automation?.scope===scope && ui.automation?.group===group?.name ? [...(ui.automation.backups || [])] : [];
+  ui.backupContext={scope,group:group?.name || '',baseline,members:(group?.members || []).map(member=>({...member})),current:group?.current};
+  ui.backupDraft=[...baseline];ui.backupPanel='choices';ui.backupError='';ui.backupChoiceKey=null;
+  $('backupSearch').value='';renderBackupEditor();
+}
+function backupContextProblem() {
+  const context=ui.backupContext, group=currentGroup(), automation=ui.automation;
+  if(!context || currentProfile()?.id!==context.scope || group?.name!==context.group ||
+      (automation && (automation.scope!==context.scope || automation.group!==context.group))) return '配置或策略组已变化，请取消后重新打开备用节点。';
+  if(!ui.core || !automation) return '连接状态暂不可用，草稿已保留；恢复后可继续编辑。';
+  return '';
+}
+function backupEditorGroup() {
+  const context=ui.backupContext, group=currentGroup();
+  return context && currentProfile()?.id===context.scope && group?.name===context.group &&
+    ui.automation?.scope===context.scope && ui.automation?.group===context.group ? group :
+    {name:context?.group,members:context?.members || [],current:context?.current};
+}
+function backupStaleNames() { const members=new Set(backupEditorGroup().members.map(member=>member.name));return ui.backupDraft.filter(name=>!members.has(name)); }
+function backupMatches() {
+  const words=$('backupSearch').value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return backupEditorGroup().members.filter(member=>words.every(word=>member.name.toLocaleLowerCase().includes(word)));
+}
+function backupRowAction(label, path) {
+  const button=el('button');button.type='button';button.setAttribute('aria-label',label);button.title=label;
+  button.innerHTML='<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="'+path+'"/></svg>';
+  return button;
+}
+function focusBackupRow(name, action) {
+  const selector=action==='remove'?'[data-remove]':action==='up'||action==='down'?'[data-move="'+action+'"]':'.drag-handle';
+  const target=[...$('backupList').querySelectorAll(selector)].find(button=>(button.dataset.name || button.dataset.remove)===name && !button.disabled);
+  const fallback=[...$('backupList').querySelectorAll('button')].find(button=>(button.dataset.name || button.dataset.remove)===name && !button.disabled);
+  const button=target || fallback;if(!button)return;
+  button.focus({preventScroll:true});
+  const frame=document.querySelector('.app main').getBoundingClientRect(), bounds=button.getBoundingClientRect();
+  if(bounds.top<frame.top || bounds.bottom>frame.bottom)button.scrollIntoView({block:'nearest'});
+}
+function renderBackupEditor(focusName, focusAction) {
+  if(!ui.backupContext)return;
+  const group=backupEditorGroup(), contextProblem=backupContextProblem(), editable=!contextProblem&&!ui.busy;
+  const selected=new Set(ui.backupDraft), stale=backupStaleNames(), dirty=backupDraftChanged();
+  const main=document.querySelector('.app main'), scroll=main.scrollTop;
+  set('backupGroupLabel','策略组 · '+ui.backupContext.group);
+  set('draftCount','已选 '+selected.size+' / '+backupLimit+(dirty?' · 未保存':''));
+  set('backupTabSelected','已选顺序（'+selected.size+'）');
+  $('saveBackups').disabled=!editable||!dirty||stale.length>0;
+  $('saveBackups').textContent='保存'+(dirty?'（'+selected.size+'）':'');
+  const warning=contextProblem || ui.backupError || (stale.length?'有 '+stale.length+' 个失效节点，请在“已选顺序”中移除后保存。':'');
+  set('backupContextWarning',warning);$('backupContextWarning').hidden=!warning;
+  for(const [id,panel] of [['backupTabChoices','choices'],['backupTabSelected','selected']]) {
+    $(id).setAttribute('aria-selected',String(ui.backupPanel===panel));$(id).tabIndex=ui.backupPanel===panel?0:-1;
+    $(id).disabled=ui.busy;
+  }
+  $('backupSelectionPanel').hidden=ui.backupPanel!=='choices';$('backupOrderPanel').hidden=ui.backupPanel!=='selected';
+  $('backupSearch').disabled=!editable;
+  const matches=backupMatches(), query=$('backupSearch').value.trim();
+  const available=matches.filter(member=>member.name!==group?.current&&!selected.has(member.name));
+  const remaining=backupLimit-selected.size;
+  set('backupSearchSummary',(query?'找到 '+matches.length+' 条':'共 '+matches.length+' 条')+' · 已选 '+selected.size+' / '+backupLimit+
+    (remaining===0?'，取消一项后可继续选择':available.length>remaining&&query?'，请缩小搜索范围再全选':''));
+  $('backupSelectResults').disabled=!editable||!query||!available.length||available.length>remaining;
+  $('backupSelectResults').textContent=query?'全选搜索结果（'+available.length+'）':'先搜索再批量选';
+  $('backupClearSelection').disabled=!editable||!selected.size;
+  $('backupRemoveStale').hidden=!stale.length;$('backupRemoveStale').disabled=!editable;
+  // Keep candidate DOM nodes alive while checking items. This preserves both
+  // the native checkbox focus and the user's position in a long search result.
+  const key=JSON.stringify([Boolean(query),matches.map(member=>member.name)]);
+  const choices=$('availableNodes');
+  if(ui.backupChoiceKey!==key) {
+    ui.backupChoiceKey=key;
+    const rows=matches.map(member=>{
+      const row=el('label','available-node backup-choice');row.dataset.backupChoice=member.name;
+      const checkbox=el('input');checkbox.type='checkbox';checkbox.dataset.backupNode=member.name;checkbox.setAttribute('aria-label','选择备用 '+member.name);
+      const copy=el('span','row-copy');copy.append(el('span','row-label',member.name),el('span','hint'));
+      row.append(checkbox,copy,el('span','backup-choice-order'));return row;
+    });
+    choices.replaceChildren(...(rows.length?rows:[el('p','empty-state',query?'没有匹配的节点，试试其他关键词。':'当前策略组暂无可选节点。')]));
+  }
+  for(const row of choices.querySelectorAll('[data-backup-choice]')) {
+    const name=row.dataset.backupChoice, checked=selected.has(name), current=name===group?.current;
+    const member=group?.members.find(item=>item.name===name), checkbox=row.querySelector('input');
+    checkbox.checked=checked;checkbox.disabled=!editable||!checked&&(current||remaining<=0);
+    row.dataset.selected=String(checked);row.dataset.disabled=String(checkbox.disabled);
+    row.querySelector('.backup-choice-order').textContent=checked?'第 '+(ui.backupDraft.indexOf(name)+1)+' 顺位':'';
+    row.querySelector('.hint').textContent=current?'当前线路，切换时会跳过':Number.isFinite(member?.delay)&&member.delay>0?'已有测速 '+member.delay+' ms':'暂无测速数据';
+  }
+  const orderKey=JSON.stringify([ui.backupDraft,stale,group?.current,editable]);
+  if(ui.backupOrderKey!==orderKey) {
+    ui.backupOrderKey=orderKey;
+    const rows=ui.backupDraft.map((name,index)=>{
+      const row=el('div','backup-row');row.dataset.name=name;
+      const handle=el('button','order-badge drag-handle',index+1);handle.type='button';handle.dataset.name=name;
+      handle.setAttribute('aria-label','排序 '+name+'，可拖动或使用上下方向键');handle.disabled=!editable;
+      const copy=el('span','row-copy');copy.append(el('span','row-label',name));
+      if(stale.includes(name))copy.append(el('span','hint','已失效，需移除后保存'));
+      else if(name===group?.current)copy.append(el('span','hint','当前线路，切换时跳过'));
+      const actions=el('div','order-actions');
+      for(const [direction,label,path,disabled] of [['up','上移','M6 15l6-6 6 6',index===0],['down','下移','M6 9l6 6 6-6',index===ui.backupDraft.length-1]]) {
+        const button=backupRowAction(label+' '+name,path);button.dataset.move=direction;button.dataset.name=name;button.disabled=!editable||disabled;actions.append(button);
+      }
+      const remove=backupRowAction('移除 '+name,'M6 6l12 12M18 6L6 18');remove.dataset.remove=name;remove.disabled=!editable;actions.append(remove);
+      row.append(handle,copy,actions);return row;
+    });
+    $('backupList').replaceChildren(...(rows.length?rows:[el('p','empty-state','还没有备用节点，切换到“选择节点”勾选。')]));
+  }
+  main.scrollTop=scroll;
+  if(focusName)focusBackupRow(focusName,focusAction);
 }
 function connectionMessage() {
   if (ui.connectionPending && !ui.connectionFailed) return el('p','connection-empty','正在读取连接…');
@@ -217,7 +319,7 @@ function renderLogs() {
   const rows=filtered.map(item=>{const row=el('div','log-item');const date=new Date(item.time);const label=Number.isFinite(date.getTime())?date.toLocaleString('zh-CN',{hour12:false}):'时间未知';const level=String(item.level||'info').toLowerCase();row.append(el('time','',label+' · '+(['error','fatal'].includes(level)?'错误':['warn','warning'].includes(level)?'警告':'信息')),el('p','',cleanLogText(item.message)));return row;});
   container.replaceChildren(...(rows.length?rows:[el('p','empty-state',ui.logs.length?'当前筛选条件下没有日志':'暂无运行日志')]));
 }
-function render() { renderHome(); if(ui.page==='lines')renderLines(); if(ui.page==='subscriptions')renderProfiles(); if(ui.page==='subscriptionDetail')renderProfileDetail(); if(ui.page==='connections')renderConnections(); if(ui.page==='connectionApp')renderConnectionApp(); if(ui.page==='connectionDetail')renderConnectionDetail(); if(ui.page==='logs')renderLogs(); window.dispatchEvent(new Event('clash-render')); }
+function render() { renderHome(); if(ui.page==='lines')renderLines(); if(ui.page==='backups')renderBackupEditor(); if(ui.page==='subscriptions')renderProfiles(); if(ui.page==='subscriptionDetail')renderProfileDetail(); if(ui.page==='connections')renderConnections(); if(ui.page==='connectionApp')renderConnectionApp(); if(ui.page==='connectionDetail')renderConnectionDetail(); if(ui.page==='logs')renderLogs(); window.dispatchEvent(new Event('clash-render')); }
 async function refreshProfiles() { try { const r=await api('profiles'); ui.profiles=r.profiles || []; render(); } catch(e) { notify(e.message); } }
 async function refreshGroups() { try { const r=await api('groups'); ui.groups=r.groups || []; const scope=currentProfile()?.id || ''; const preferred=ui.groupScope!==scope && ui.automation?.scope===scope ? ui.automation.group : ui.group; ui.group=ui.groups.some(g=>g.name===preferred)?preferred:(ui.groups[0]?.name||''); if(ui.groups.length)ui.groupScope=scope; render(); } catch { ui.groups=[]; render(); } }
 let connectionRequestId = 0;
@@ -245,7 +347,7 @@ async function refresh() {
   try { const value=await api('autostart'); ui.autostart=typeof value.enabled==='boolean' && typeof value.conflict==='boolean' ? value : null; } catch { ui.autostart=null; }
   try { const value=await api('tray'); ui.tray=typeof value.closeToTray==='boolean' ? value : null; } catch { ui.tray=null; }
   try { ui.automation=await api('automation'); } catch { ui.automation=null; }
-  if(ui.core && (ui.page==='home'||ui.page==='lines'||ui.groupScope!==(currentProfile()?.id||''))) await refreshGroups();
+  if(ui.core && (ui.page==='home'||ui.page==='lines'||ui.page==='backups'||ui.groupScope!==(currentProfile()?.id||''))) await refreshGroups();
   try { const g=currentGroup(); if(ui.automation && g && currentProfile() && (ui.automation.group!==g.name || ui.automation.scope!==currentProfile().id)) ui.automation=await api('automation',{group:g.name}); if(ui.automation?.phase==='recovered')ui.diagnosis=null; } catch { ui.automation=null; }
   if(['connections','connectionApp','connectionDetail'].includes(ui.page)) await refreshConnections();
   render();
@@ -322,15 +424,66 @@ for(const [id,field] of [['autoRepairSwitch','autoRepair'],['autoSwitch','autoSw
   }
   action('正在保存设置…',async()=>{ui.automation=await api('automation',{group:group.name,[field]:!ui.automation[field]});notify('设置已保存');}).catch(()=>{});
 });
-$('availableNodes').addEventListener('click',event=>{const b=event.target.closest('[data-add]');if(!b||b.disabled)return;ui.backupDraft.push(b.dataset.add);renderBackupEditor(b.dataset.add);});
-$('backupList').addEventListener('click',event=>{const b=event.target.closest('[data-remove]');if(!b)return;ui.backupDraft=ui.backupDraft.filter(x=>x!==b.dataset.remove);renderBackupEditor();});
+$('availableNodes').addEventListener('change',event=>{
+  const checkbox=event.target.closest('[data-backup-node]');if(!checkbox||checkbox.disabled)return;
+  const name=checkbox.dataset.backupNode;
+  if(checkbox.checked) {
+    if(backupContextProblem()||ui.backupDraft.length>=backupLimit||name===backupEditorGroup().current){checkbox.checked=false;return;}
+    if(!ui.backupDraft.includes(name))ui.backupDraft.push(name);
+  } else ui.backupDraft=ui.backupDraft.filter(value=>value!==name);
+  ui.backupError='';renderBackupEditor();
+});
+$('backupSearch').addEventListener('input',()=>renderBackupEditor());
+function switchBackupPanel(panel) {
+  if(ui.busy)return;ui.backupPanel=panel;renderBackupEditor();
+  document.querySelector('.app main').scrollTop=0;
+  $(panel==='choices'?'backupTabChoices':'backupTabSelected').focus({preventScroll:true});
+}
+for(const [id,panel] of [['backupTabChoices','choices'],['backupTabSelected','selected']]) {
+  $(id).addEventListener('click',()=>switchBackupPanel(panel));
+  $(id).addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();switchBackupPanel(event.key==='Home'?'choices':event.key==='End'?'selected':panel==='choices'?'selected':'choices');
+  });
+}
+$('backupSelectResults').addEventListener('click',()=>{
+  if(backupContextProblem()||ui.busy||!$('backupSearch').value.trim())return;
+  const group=backupEditorGroup(), names=backupMatches().filter(member=>member.name!==group.current&&!ui.backupDraft.includes(member.name)).map(member=>member.name);
+  if(names.length>backupLimit-ui.backupDraft.length)return;
+  ui.backupDraft.push(...names);ui.backupError='';renderBackupEditor();set('announcement','已选中搜索结果 '+names.length+' 个，点击保存后生效。');
+});
+$('backupClearSelection').addEventListener('click',()=>{
+  if(backupContextProblem()||ui.busy)return;ui.backupDraft=[];ui.backupError='';renderBackupEditor();set('announcement','已清空草稿，点击保存后生效。');
+});
+$('backupRemoveStale').addEventListener('click',()=>{
+  if(backupContextProblem()||ui.busy)return;const stale=new Set(backupStaleNames());ui.backupDraft=ui.backupDraft.filter(name=>!stale.has(name));ui.backupError='';renderBackupEditor();set('announcement','已从草稿移除 '+stale.size+' 个失效节点。');
+});
+$('backupList').addEventListener('click',event=>{
+  const button=event.target.closest('[data-remove],[data-move]');if(!button||button.disabled||backupContextProblem()||ui.busy)return;
+  const name=button.dataset.remove || button.dataset.name, index=ui.backupDraft.indexOf(name);
+  if(index<0)return;
+  if(button.dataset.remove) {
+    ui.backupDraft.splice(index,1);ui.backupError='';renderBackupEditor(ui.backupDraft[Math.min(index,ui.backupDraft.length-1)],'remove');
+  } else {
+    const target=index+(button.dataset.move==='up'?-1:1);if(target<0||target>=ui.backupDraft.length)return;
+    [ui.backupDraft[index],ui.backupDraft[target]]=[ui.backupDraft[target],ui.backupDraft[index]];
+    ui.backupError='';renderBackupEditor(name,button.dataset.move);set('announcement',name+'已调整为第 '+(target+1)+' 顺位');
+  }
+});
 let dragBackup=null;
-$('backupList').addEventListener('pointerdown',event=>{const handle=event.target.closest('.drag-handle');if(!handle||event.button!==0)return;event.preventDefault();dragBackup={handle,row:handle.closest('.backup-row'),name:handle.dataset.name,id:event.pointerId};handle.setPointerCapture(event.pointerId);dragBackup.row.classList.add('dragging');});
+$('backupList').addEventListener('pointerdown',event=>{const handle=event.target.closest('.drag-handle');if(!handle||handle.disabled||event.button!==0||backupContextProblem()||ui.busy)return;event.preventDefault();dragBackup={handle,row:handle.closest('.backup-row'),name:handle.dataset.name,id:event.pointerId};handle.setPointerCapture(event.pointerId);dragBackup.row.classList.add('dragging');});
 $('backupList').addEventListener('pointermove',event=>{if(!dragBackup||event.pointerId!==dragBackup.id)return;const list=$('backupList');const others=[...list.querySelectorAll('.backup-row')].filter(row=>row!==dragBackup.row);const before=others.find(row=>event.clientY<row.getBoundingClientRect().top+row.offsetHeight/2);list.insertBefore(dragBackup.row,before||null);[...list.querySelectorAll('.backup-row')].forEach((row,i)=>row.querySelector('.order-badge').textContent=i+1);});
-function finishDrag(event,cancel){if(!dragBackup||event.pointerId!==dragBackup.id)return;const name=dragBackup.name;if(!cancel)ui.backupDraft=[...$('backupList').querySelectorAll('.backup-row')].map(row=>row.dataset.name);dragBackup=null;renderBackupEditor(name);}
+function finishDrag(event,cancel){if(!dragBackup||event.pointerId!==dragBackup.id)return;const name=dragBackup.name;if(!cancel)ui.backupDraft=[...$('backupList').querySelectorAll('.backup-row')].map(row=>row.dataset.name);dragBackup.row.classList.remove('dragging');dragBackup=null;ui.backupOrderKey=null;renderBackupEditor(name);}
 $('backupList').addEventListener('pointerup',e=>finishDrag(e,false));$('backupList').addEventListener('pointercancel',e=>finishDrag(e,true));
-$('backupList').addEventListener('keydown',event=>{const handle=event.target.closest('.drag-handle');if(!handle||!['ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();const name=handle.dataset.name,i=ui.backupDraft.indexOf(name),j=i+(event.key==='ArrowUp'?-1:1);if(j<0||j>=ui.backupDraft.length)return;[ui.backupDraft[i],ui.backupDraft[j]]=[ui.backupDraft[j],ui.backupDraft[i]];renderBackupEditor(name);set('announcement',name+'已调整为第 '+(j+1)+' 顺位');});
-$('saveBackups').addEventListener('click',()=>{const group=currentGroup();if(!group)return;action('正在保存备用节点…',async()=>{ui.automation=await api('automation',{group:group.name,backups:ui.backupDraft});openPage('settings',true);notify('备用节点已保存');}).catch(()=>{});});
+$('backupList').addEventListener('keydown',event=>{const handle=event.target.closest('.drag-handle');if(!handle||handle.disabled||backupContextProblem()||ui.busy||!['ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();const name=handle.dataset.name,i=ui.backupDraft.indexOf(name),j=i+(event.key==='ArrowUp'?-1:1);if(j<0||j>=ui.backupDraft.length)return;[ui.backupDraft[i],ui.backupDraft[j]]=[ui.backupDraft[j],ui.backupDraft[i]];ui.backupError='';renderBackupEditor(name);set('announcement',name+'已调整为第 '+(j+1)+' 顺位');});
+$('saveBackups').addEventListener('click',()=>{
+  if(ui.busy||backupContextProblem()||!backupDraftChanged()||backupStaleNames().length)return;
+  const context=ui.backupContext, draft=[...ui.backupDraft];ui.backupError='';
+  action('正在保存备用节点…',async()=>{
+    ui.automation=await api('automation',{scope:context.scope,group:context.group,backups:draft});
+    context.baseline=[...draft];openPage('settings',true);notify('备用节点已保存');
+  }).catch(error=>{ui.backupError=error.message || '保存失败，草稿已保留，请重试。';renderBackupEditor();});
+});
 $('cancelBackups').addEventListener('click',()=>openPage('settings',true));
 $('keepEditing').addEventListener('click',()=>{$('discardDialog').close();ui.pendingPage='';});
 $('discardChanges').addEventListener('click',()=>{const next=ui.pendingPage;ui.pendingPage='';$('discardDialog').close();if(next)openPage(next,true);});

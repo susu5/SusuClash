@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,writeFile,rename} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {createDailyUpdate} from '../src/daily-update.mjs';
@@ -38,6 +38,42 @@ test('disabling persists across restart; manual check is still available and res
  assert.equal((await one.checkNow()).status,'unreleased');assert.equal(calls,1);assert.equal((await one.get()).enabled,false);one.stop();
  c.set(c.now()+DAY*2);const two=make(directory,checker,c);two.start();await new Promise(resolve=>setTimeout(resolve,20));assert.equal((await two.get()).enabled,false);assert.equal(c.tasks.size,0);assert.equal(calls,1);
  await two.set({enabled:true});await eventually(()=>c.tasks.size===1);assert.equal([...c.tasks.values()][0].delay,0);c.fire();await eventually(async()=>calls===2&&!(await two.get()).checking);two.stop();
+});
+
+test('transient Windows update metadata denial retries only the same owned replacement', {skip:process.platform!=='win32'},async t=>{
+ const directory=await temp(t),c=clock();let renames=0,calls=0;
+ const service=make(directory,{check:async()=>{calls++;return fixture()}},c,{system:{renameMetadata:async(from,to)=>{
+   renames++;if(renames<3)throw Object.assign(Error('private disk detail'),{code:'EPERM'});return rename(from,to);
+ }}});
+ await service.set({enabled:false});assert.equal(renames,3);assert.equal(calls,0);
+ assert.equal((await service.checkNow()).status,'unreleased');assert.equal(calls,1);assert.equal(renames,5);
+ assert.equal((await service.get()).enabled,false);
+ const stored=JSON.parse(await readFile(path.join(directory,'application-update.json'),'utf8'));
+ assert.equal(stored.enabled,false);assert.equal(stored.lastResult.status,'unreleased');service.stop();
+});
+
+test('persistent Windows update metadata denial is bounded and never retries the checker request', {skip:process.platform!=='win32'},async t=>{
+ const directory=await temp(t),c=clock();let renames=0,calls=0;
+ const service=make(directory,{check:async()=>{calls++;return fixture()}},c,{system:{renameMetadata:async()=>{
+   renames++;throw Object.assign(Error('private disk detail'),{code:'EPERM'});
+ }}});
+ assert.equal((await service.checkNow()).status,'unreleased');
+ // The attempt timestamp and final result are separate owned saves, each
+ // bounded to six disk attempts. The network checker itself runs exactly once.
+ assert.equal(renames,12);assert.equal(calls,1);assert.equal((await service.get()).enabled,false);
+ service.start();await new Promise(resolve=>setTimeout(resolve,20));assert.equal(c.tasks.size,0);assert.equal(calls,1);service.stop();
+});
+
+test('an external update preference change stops replacement before any checker request',async t=>{
+ const directory=await temp(t),c=clock();let calls=0,renames=0;
+ const file=path.join(directory,'application-update.json');
+ const external=Buffer.from('{"enabled":false,"lastCheckedAt":null,"lastResult":null,"external":"keep"}\r\n');
+ const service=make(directory,{check:async()=>{calls++;return fixture()}},c,{system:{
+   renameMetadata:async(from,to)=>{renames++;return rename(from,to);},
+   metadataHook:async({phase})=>{if(phase==='beforeMetadataReplace')await writeFile(file,external);}
+ }});
+ await assert.rejects(service.set({enabled:true}),error=>error.code==='METADATA_TARGET_CHANGED');
+ assert.equal(calls,0);assert.equal(renames,0);assert.deepEqual(await readFile(file),external);service.stop();
 });
 
 test('failure still records an attempt and never loops on restart',async t=>{

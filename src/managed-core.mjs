@@ -10,6 +10,7 @@ import { parseAllDocuments, stringify } from 'yaml';
 import { AppError, requestCore } from './mihomo.mjs';
 import { maxConfigBytes } from './config-limits.mjs';
 import { prepareCoreGeodata } from './geodata.mjs';
+import { readMetadataSnapshot, writeAtomicMetadata } from './atomic-metadata.mjs';
 
 const runFile = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,6 +49,32 @@ export function coreValidationFailure(error) {
     return new AppError('订阅中的配置字段与内核格式不匹配，请检查配置。', 422);
   }
   return new AppError('配置校验失败，请检查格式和内核支持的协议。', 400);
+}
+
+function coreRuntimeFailure(output, error) {
+  if (['ENOENT','EACCES','EPERM'].includes(error?.code)) return coreValidationFailure(error).message;
+  for (const line of output.split(/\r?\n/)) {
+    // Provider and node names appear in normal logs. Only inspect a complete
+    // top-level fatal/panic record or Mihomo's fixed mixed-listener error;
+    // keywords, forged severity text and partial fields inside a name are not
+    // evidence that an otherwise verified local core failed to start.
+    if (/^panic:\s/.test(line)) return '内核发生致命错误，请检查运行记录。';
+    const match = /^(?:time=(?:"(?:\\.|[^"\\])*"|\S+)\s+)?level=(fatal|panic|error)\s+msg=("(?:\\.|[^"\\])*")(?=\s|$)/i.exec(line);
+    if (!match) continue;
+    let message;
+    try { message = JSON.parse(match[2]); } catch { continue; }
+    const fatal = /^(fatal|panic)$/i.test(match[1]);
+    const listener = /^Start Mixed\(http\+socks\) server error:\s*(?:listen|bind)\b/i.test(message);
+    if (!fatal && !listener) continue;
+    if (/address already in use|only one usage of each socket address|bind[^\r\n]*(?:failed|forbidden)|listen[^\r\n]*permission denied/i.test(message)) {
+      return '内核监听端口被占用或不允许使用，请检查端口状态。';
+    }
+    if (fatal) {
+      const failure = coreValidationFailure({stdout:message});
+      return failure.status !== 400 ? failure.message : '内核发生致命错误，请检查运行记录。';
+    }
+  }
+  return null;
 }
 
 // Resolve YAML aliases/merges before overriding privileged and listening fields.
@@ -112,14 +139,74 @@ async function checkPort(port) {
   await new Promise(resolve => server.close(resolve));
 }
 
+function isListening(port) {
+  return new Promise(resolve => {
+    const socket = net.connect({host:'127.0.0.1',port});
+    let done = false;
+    const finish = value => { if (done) return; done=true; socket.destroy(); resolve(value); };
+    socket.setTimeout(400,()=>finish(false));
+    socket.once('connect',()=>finish(true));
+    socket.once('error',()=>finish(false));
+  });
+}
+
+function waitBriefly(promise) {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve,300);
+    Promise.resolve(promise).then(()=>{clearTimeout(timer);resolve();},()=>{clearTimeout(timer);resolve();});
+  });
+}
+
+function streamDrained(stream) {
+  if (!stream || stream.readableEnded || stream.destroyed) return Promise.resolve();
+  return new Promise(resolve => {
+    const finish = () => { stream.removeListener('end',finish);stream.removeListener('close',finish);stream.removeListener('error',finish);resolve(); };
+    stream.once('end',finish);stream.once('close',finish);stream.once('error',finish);
+  });
+}
+
 export function createManagedCore({ directory = defaultDataDir, binary = process.env.CLASH_APP_MIHOMO || ownBinary, runtimeDirectory = path.join(root,'runtime'), launch = spawn, testFile = runFile } = {}) {
   let child = null, endpoint = null, currentStatus = 'stopped', message = '尚未启动内核', version = null, lastConfig = null, stopping = false;
   let pendingStart = null;
   let assignedProxyPort = null;
+  let persistedProxyPort = null;
+  let portFingerprint = null;
   let loadedPort = false;
   let preparingDirectory = null;
   const coreDirectory = path.join(directory, 'core');
   const runtime = path.join(coreDirectory, 'runtime.yaml');
+  const lifecycleFile = path.join(coreDirectory, 'lifecycle.json');
+  const lifecycle = [];
+  let lifecycleTail = Promise.resolve();
+  let exitSummaryTail = Promise.resolve();
+  let lastFailure = null;
+  async function writeLifecycle(file, content) {
+    const temp = file + '.' + randomBytes(8).toString('hex') + '.tmp';
+    try {
+      await mkdir(coreDirectory,{recursive:true});
+      await writeFile(temp,content,{mode:0o600,flag:'wx'});
+      await rename(temp,file);
+    } finally { await unlink(temp).catch(()=>{}); }
+  }
+  function recordLifecycle(phase, startedAt, reason, exitCode = null, signal = null) {
+    const entry = {at:new Date().toISOString(), phase, durationMs:Math.max(0, Date.now()-startedAt), reason,
+      exitCode:Number.isInteger(exitCode)?exitCode:null,
+      signal:['SIGTERM','SIGKILL','SIGINT','SIGABRT','SIGSEGV'].includes(signal)?signal:null};
+    lifecycle.push(entry);
+    if (lifecycle.length > 16) lifecycle.shift();
+    const failed = ['startup_failed','validation_failed','unexpected_exit'].includes(phase);
+    if (failed) lastFailure = {...entry};
+    // Only fixed summaries reach disk. Never retain the child's raw output,
+    // paths, arguments, subscription addresses or proxy credentials here.
+    const content = JSON.stringify({version:1,entries:lifecycle});
+    lifecycleTail = lifecycleTail.then(async () => {
+      await writeLifecycle(lifecycleFile,content).catch(()=>{});
+      // A later successful launch must not erase the previous failure's
+      // evidence. This second fixed-size record is written only on failure.
+      if (failed) await writeLifecycle(path.join(coreDirectory,'last-failure.json'),JSON.stringify({version:1,...entry})).catch(()=>{});
+    }).catch(()=>{});
+    return lifecycleTail;
+  }
   function cleanEnvironment(secret) {
     const env = { ...process.env };
     for (const name of Object.keys(env)) if (name.toUpperCase() === 'SAFE_PATHS' || name.toUpperCase().startsWith('CLASH_')) delete env[name];
@@ -132,42 +219,49 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
   async function loadPort() {
     if (loadedPort) return;
     try {
-      const value = JSON.parse(await readFile(path.join(directory, 'port.json'), 'utf8'))?.port;
-      if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error('invalid port');
-      assignedProxyPort = value;
-    } catch (error) { if (error.code !== 'ENOENT') throw new AppError('无法读取保存的代理端口，请检查应用配置。', 503); }
+      const snapshot = await readMetadataSnapshot(path.join(directory, 'port.json'), {maxBytes:4096});
+      if (snapshot.bytes !== null) {
+        const value = JSON.parse(snapshot.bytes.toString('utf8'))?.port;
+        if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error('invalid port');
+        assignedProxyPort = value;
+        persistedProxyPort = value;
+      }
+      portFingerprint = snapshot.fingerprint;
+    } catch { throw new AppError('无法读取保存的代理端口，请检查应用配置。', 503); }
     loadedPort = true;
   }
   async function persistPort(port) {
     await mkdir(directory, {recursive:true});
     const file = path.join(directory,'port.json');
-    const temp = file + '.' + randomBytes(8).toString('hex') + '.tmp';
-    try { await writeFile(temp,JSON.stringify({port}),{mode:0o600,flag:'wx'}); await rename(temp,file); }
-    finally { await unlink(temp).catch(()=>{}); }
+    const saved = await writeAtomicMetadata(file, JSON.stringify({port}), {expected:portFingerprint,maxBytes:4096});
+    portFingerprint = saved.fingerprint;
+    persistedProxyPort = port;
   }
   function prepareDirectory() {
     return preparingDirectory ??= prepareCoreGeodata({runtimeDirectory,coreDirectory}).finally(()=>{preparingDirectory=null;});
   }
-  function status() { return { state: currentStatus, message, version }; }
+  function status() { return { state: currentStatus, message, version, lastFailure:lastFailure?{...lastFailure}:null }; }
   async function writeSafe(sourcePath, target, port) {
     const input = await readFile(sourcePath, 'utf8');
     await writeFile(target, safeRuntimeConfig(input, port), { mode: 0o600 });
   }
   async function validateConfig(sourcePath) {
-    if (!await available()) throw new AppError('未找到本软件的 Mihomo 内核，请先安装内核。', 503);
-    await prepareDirectory();
+    const startedAt = Date.now();
     const tmp = path.join(coreDirectory, 'validate-' + randomBytes(8).toString('hex') + '.yaml');
     try {
+      if (!await available()) throw new AppError('未找到本软件的 Mihomo 内核，请先安装内核。', 503);
+      await prepareDirectory();
       await writeSafe(sourcePath, tmp, 0);
       const secret = randomBytes(24).toString('hex');
       await testFile(binary, ['-d', coreDirectory, '-f', tmp, '-t', '-ext-ctl', '127.0.0.1:0', '-secret', secret], { timeout: 15000, maxBuffer: 512 * 1024, windowsHide: true, env:cleanEnvironment(secret) });
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw coreValidationFailure(error);
+      const failure = error instanceof AppError ? error : coreValidationFailure(error);
+      await waitBriefly(recordLifecycle('validation_failed',startedAt,failure.message,Number.isInteger(error?.code)?error.code:null,error?.signal));
+      throw failure;
     } finally { await unlink(tmp).catch(() => {}); }
   }
   async function stop() {
-    if (!child) { currentStatus = 'stopped'; message = '内核已停止'; endpoint = null; return; }
+    if (!child) { currentStatus = 'stopped'; message = '内核已停止'; endpoint = null; await waitBriefly(exitSummaryTail.then(()=>lifecycleTail)); return; }
     stopping = true;
     const old = child; endpoint = null;
     try {
@@ -182,36 +276,100 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
       });
       if(child===old)child=null;
       currentStatus='stopped';message='内核已停止';
+      await waitBriefly(exitSummaryTail.then(()=>lifecycleTail));
     } finally {stopping=false;}
   }
   async function startInternal(sourcePath) {
-    if (!await available()) { currentStatus = 'missing'; message = '未找到本软件的 Mihomo 内核'; throw new AppError(message, 503); }
-    await prepareDirectory();
-    await loadPort();
-    const proxyPort = assignedProxyPort ??= await freePort();
-    await checkPort(proxyPort);
-    const controlPort = await freePort();
-    const secret = randomBytes(32).toString('hex');
-    await writeSafe(sourcePath, runtime, proxyPort);
-    currentStatus = 'starting'; message = '内核正在启动';
-    const processHandle = launch(binary, ['-d', coreDirectory, '-f', runtime, '-ext-ctl', '127.0.0.1:' + controlPort, '-secret', secret], { windowsHide: true, stdio: 'ignore', env:cleanEnvironment(secret) });
-    child = processHandle;
-    const target = { address: { hostname: '127.0.0.1', port: controlPort }, secret };
-    processHandle.once('error', () => { if (child === processHandle) { child = null; endpoint = null; currentStatus = 'error'; message = '内核启动失败'; } });
-    processHandle.once('exit', () => { if (child === processHandle) { child = null; endpoint = null; currentStatus = stopping ? 'stopped' : 'error'; message = stopping ? '内核已停止' : '内核意外退出'; } });
-    const until = Date.now() + 8000;
-    while (Date.now() < until && child === processHandle) {
-      try {
-        const value = await requestCore(target, 'GET', '/version', null, 500);
+    const startedAt = Date.now();
+    let processHandle;
+    let output = Buffer.alloc(0);
+    let outputFailure = null;
+    let spawnFailure = null;
+    let exitedCode = null;
+    let exitedSignal = null;
+    let outputDrained = Promise.resolve();
+    try {
+      if (!await available()) { currentStatus = 'missing'; message = '未找到本软件的 Mihomo 内核'; throw new AppError(message, 503); }
+      await prepareDirectory();
+      await loadPort();
+      const proxyPort = assignedProxyPort ??= await freePort();
+      await checkPort(proxyPort);
+      const controlPort = await freePort();
+      const secret = randomBytes(32).toString('hex');
+      await writeSafe(sourcePath, runtime, proxyPort);
+      currentStatus = 'starting'; message = '内核正在启动';
+      processHandle = launch(binary, ['-d', coreDirectory, '-f', runtime, '-ext-ctl', '127.0.0.1:' + controlPort, '-secret', secret], { windowsHide: true, stdio: ['ignore','pipe','pipe'], env:cleanEnvironment(secret) });
+      child = processHandle;
+      const consume = chunk => {
+        // Drain both streams throughout the process lifetime without unbounded
+        // memory, pipe backpressure or any raw-output persistence.
+        output = Buffer.concat([output,Buffer.from(chunk).subarray(-16384)]).subarray(-16384);
+        outputFailure = coreRuntimeFailure(output.toString('utf8')) || outputFailure;
+      };
+      processHandle.stdout?.on('data', consume);
+      processHandle.stderr?.on('data', consume);
+      processHandle.stdout?.on('error', ()=>{});
+      processHandle.stderr?.on('error', ()=>{});
+      outputDrained = Promise.all([streamDrained(processHandle.stdout),streamDrained(processHandle.stderr)]);
+      const target = { address: { hostname: '127.0.0.1', port: controlPort }, secret };
+      processHandle.once('error', error => { spawnFailure = coreRuntimeFailure('',error); if (child === processHandle) { child = null; endpoint = null; currentStatus = 'error'; message = spawnFailure || '内核启动失败'; } });
+      processHandle.once('exit', (code, signal) => {
+        exitedCode = code; exitedSignal = signal;
+        if (child === processHandle) {
+          const wasRunning = currentStatus === 'running';
+          child = null; endpoint = null; currentStatus = stopping ? 'stopped' : 'error';
+          const intentional = stopping;
+          message = intentional ? '内核已停止' : outputFailure || '内核意外退出';
+          if (!intentional && wasRunning) exitSummaryTail = Promise.all([exitSummaryTail,waitBriefly(outputDrained).then(() => {
+            const reason = outputFailure || '内核意外退出';
+            if (!child && currentStatus === 'error') message = reason;
+            return recordLifecycle('unexpected_exit',startedAt,reason,code,signal);
+          })]).then(()=>{});
+        }
+      });
+      const until = Date.now() + 8000;
+      let readySamples = 0;
+      while (Date.now() < until && child === processHandle) {
+        let value;
+        try { value = await requestCore(target, 'GET', '/version', null, 500); }
+        catch { /* process may still be starting */ }
         if (typeof value?.version === 'string') {
+          let config;
+          try { config = await requestCore(target,'GET','/configs',null,500); } catch {}
+          const ready = Number(config?.['mixed-port']) === proxyPort && await isListening(proxyPort);
+          readySamples = ready ? readySamples + 1 : 0;
+          if (outputFailure) throw new AppError(outputFailure,503);
+          if (readySamples < 2) { await new Promise(resolve=>setTimeout(resolve,120)); continue; }
+          if (child !== processHandle) break;
+          if (persistedProxyPort === null) {
+            try { await persistPort(proxyPort); }
+            catch { throw new AppError('无法保存代理端口，本次内核启动已取消，请检查数据目录。',503); }
+          }
+          if (child !== processHandle) break;
           endpoint = target; version = value.version; currentStatus = 'running'; message = '内核运行中';
+          void recordLifecycle('running',startedAt,message);
           return status();
         }
-      } catch { /* process may still be starting */ }
-      await new Promise(resolve => setTimeout(resolve, 120));
+        else readySamples = 0;
+        await new Promise(resolve => setTimeout(resolve, 120));
+      }
+      if (child !== processHandle) await waitBriefly(outputDrained);
+      throw new AppError(outputFailure || spawnFailure || (child === processHandle ? '等待内核就绪超时，本次启动已停止。' : '内核在启动期间退出，请检查运行记录。'),503);
+    } catch (error) {
+      const failure = error instanceof AppError ? error : new AppError('内核启动失败，请检查配置与数据目录。',503);
+      if (processHandle && child === processHandle) {
+        try { await stop(); }
+        catch {
+          currentStatus = 'error'; message = '内核启动失败，尚未确认本次内核已退出，请检查运行状态。';
+          await waitBriefly(recordLifecycle('startup_failed',startedAt,message,exitedCode,exitedSignal));
+          throw new AppError(message,503);
+        }
+      }
+      if (currentStatus !== 'missing') currentStatus = 'error';
+      message = failure.message;
+      await waitBriefly(recordLifecycle('startup_failed',startedAt,message,exitedCode,exitedSignal));
+      throw failure;
     }
-    await stop(); currentStatus = 'error'; message = '内核启动失败，请检查配置与运行日志';
-    throw new AppError(message, 503);
   }
   async function applyConfig(sourcePath) {
     await validateConfig(sourcePath);
@@ -228,6 +386,9 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
       await copyFile(newFile, active);
       lastConfig = active;
     } catch (error) {
+      // Loading succeeded but saving active.yaml can still fail. Confirm the
+      // new process exited before trying rollback on the same proxy port.
+      if (child) await stop();
       if (hadOld) {
         try { await startInternal(oldFile); lastConfig = active; }
         catch { throw new AppError('新配置加载失败，恢复旧内核也失败，请检查配置。', 503); }
@@ -246,7 +407,7 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
   async function setPort(port) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new AppError('请输入 1 到 65535 的端口。', 400);
     await loadPort();
-    if (assignedProxyPort === port) return {port};
+    if (assignedProxyPort === port && persistedProxyPort === port) return {port};
     await checkPort(port);
     const previous = assignedProxyPort;
     const running = currentStatus === 'running';
@@ -272,7 +433,7 @@ export function createManagedCore({ directory = defaultDataDir, binary = process
     try { return await requestCore(endpoint, method, route, body, timeout); }
     catch (error) { if (error instanceof AppError) throw error; throw new AppError('与本软件内核的连接中断。', 503); }
   }
-  return { call, status, start, stop, setPort, validateConfig, applyConfig, directory,
+  return { call, status, start, stop, setPort, validateConfig, applyConfig, directory, validatesConfig:true,
     processId() { return currentStatus === 'running' && Number.isInteger(child?.pid) ? child.pid : null; },
     async identity() { return { version, transport: '本机 HTTP' }; },
     async preferences() { await loadPort(); return { expectedPort: assignedProxyPort, autoLaunch: null }; }

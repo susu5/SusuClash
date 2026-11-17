@@ -56,6 +56,46 @@ test('repair is independent, rechecks and prevents unnecessary switching', async
   assert.equal(repairs,1); assert.equal(selected,0); assert.equal(monitor.status().phase,'recovered');
 });
 
+test('confirmed core failure recovers without a routing group and verifies its proxy entry', async () => {
+  let repairs = 0, selections = 0;
+  const monitor = createAutomation({
+    probe:async()=>observation({group:'',current:'',core:repairs ? 'ok' : 'failed',port:repairs ? 'ok' : 'unknown'}),
+    repair:async({problem})=>{ assert.equal(problem,'core'); repairs++; return {ok:true}; },
+    select:async()=>{ selections++; },verify:async()=> 'ok'
+  });
+  await monitor.configure({autoRepair:true});
+  await monitor.runNow(); assert.equal(repairs,0);
+  await monitor.runNow();
+  assert.equal(repairs,1); assert.equal(selections,0);
+  assert.equal(monitor.status().phase,'recovered');
+});
+
+test('core recovery requires the same profile and a working proxy entry after restart', async () => {
+  for (const after of [{port:'failed'},{port:'unknown'},{scope:'different-profile'}]) {
+    let repairs = 0;
+    const monitor = createAutomation({
+      probe:async()=>observation({group:'',current:'',core:repairs ? 'ok' : 'failed',...(repairs ? after : {})}),
+      repair:async()=>{ repairs++; return {ok:true}; },select:async()=>assert.fail('core repair must not select a node'),verify:async()=> 'ok'
+    });
+    await monitor.configure({autoRepair:true});
+    await monitor.runNow(); await monitor.runNow();
+    assert.equal(repairs,1); assert.notEqual(monitor.status().phase,'recovered');
+  }
+});
+
+test('an unknown or intentionally stopped core and disabled repair never cause a restart', async () => {
+  for (const [core, autoRepair] of [['unknown',true],['failed',false]]) {
+    let repairs = 0;
+    const monitor = createAutomation({
+      probe:async()=>observation({group:'',current:'',core}),
+      repair:async()=>{ repairs++; return {ok:true}; },select:async()=>assert.fail('no node selection'),verify:async()=> 'ok'
+    });
+    await monitor.configure({autoRepair});
+    await monitor.runNow(); await monitor.runNow();
+    assert.equal(repairs,0);
+  }
+});
+
 test('no overlap, persistent scope isolation and failed candidates remain visible', async () => {
   let writes, calls = 0; const gate = deferred();
   const monitor = createAutomation({probe:async()=>{calls++; return gate.promise;},repair:async()=>({ok:false}),select:async()=>{},verify:async()=> 'ok',persist:async config=>{writes=config;}});

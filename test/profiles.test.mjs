@@ -36,6 +36,89 @@ test('a manifest changed after initialization is rejected before applying a cach
   await assert.rejects(f.store.activate(item.id),error=>error.status===409);assert.deepEqual(f.applied,[]);assert.deepEqual(await readFile(f.manifest),bytes);
 });
 
+test('reactivating the selected profile retries a failed startup restore without rewriting metadata', async t=>{
+  const f=await metadataFixture(t,{}),item=await f.store.addLocal({name:'A',content:'valid: a\n'});
+  await f.store.activate(item.id);
+  const before=await readFile(f.manifest);
+  let unavailable=true,running=false,validations=0,applications=0;
+  const reopened=createProfileStore({directory:f.directory,
+    validateConfig:async()=>{validations++;},
+    applyConfig:async()=>{applications++;if(unavailable)throw Error('fixture unavailable');running=true;}
+  });
+  await assert.rejects(reopened.restoreActive(),error=>error.status===503);
+  assert.equal(running,false);
+  unavailable=false;
+  assert.equal((await reopened.activate(item.id)).active,true);
+  assert.equal(running,true);assert.equal(validations,2);assert.equal(applications,2);
+  assert.deepEqual(await readFile(f.manifest),before);
+});
+
+test('reactivating the selected profile rejects validation and runtime failures without changing selection', async t=>{
+  const f=await metadataFixture(t,{}),item=await f.store.addLocal({name:'A',content:'valid: a\n'});
+  await f.store.activate(item.id);
+  const before=await readFile(f.manifest);
+  let invalid=true,applications=0;
+  const reopened=createProfileStore({directory:f.directory,
+    validateConfig:async()=>{if(invalid)throw Error('private validation details');},
+    applyConfig:async()=>{applications++;throw Error('private runtime details');}
+  });
+  const activationFailed=error=>error.status===422 && /配置启用失败/.test(error.message) && !error.message.includes('private');
+  await assert.rejects(reopened.activate(item.id),activationFailed);
+  assert.equal(applications,0);
+  invalid=false;
+  await assert.rejects(reopened.activate(item.id),activationFailed);
+  assert.equal(applications,1);assert.equal((await reopened.list()).activeId,item.id);
+  assert.deepEqual(await readFile(f.manifest),before);
+});
+
+test('reactivating the selected profile preserves an external manifest change before touching the core', async t=>{
+  const f=await metadataFixture(t,{}),item=await f.store.addLocal({name:'A',content:'valid: a\n'});
+  await f.store.activate(item.id);
+  const foreign=JSON.parse(await readFile(f.manifest,'utf8'));foreign.profiles[0].name='External';
+  const bytes=Buffer.from(JSON.stringify(foreign));await writeFile(f.manifest,bytes);
+  await assert.rejects(f.store.activate(item.id),error=>error.status===409);
+  assert.deepEqual(f.applied,['valid: a\n']);assert.deepEqual(await readFile(f.manifest),bytes);
+});
+
+test('opt-in validated application runs one core validation during activation and startup restore', async t=>{
+  const f=await metadataFixture(t,{});
+  let preflights=0,coreValidations=0,running=null;
+  const options={directory:f.directory,applyConfigValidates:true,
+    validateConfig:async()=>{preflights++;},
+    applyConfig:async target=>{coreValidations++;const content=await readFile(target,'utf8');assert.match(content,/^valid:/);running=content;}
+  };
+  const store=createProfileStore(options);
+  const item=await store.addLocal({name:'A',content:'valid: a\n'});
+  assert.equal(preflights,1,'imports still receive their own preflight');
+  await store.activate(item.id);
+  assert.equal(preflights,1);assert.equal(coreValidations,1);assert.equal(running,'valid: a\n');
+  const before=await readFile(f.manifest);running=null;
+  const reopened=createProfileStore(options);
+  await reopened.restoreActive();
+  assert.equal(preflights,1);assert.equal(coreValidations,2);assert.equal(running,'valid: a\n');
+  await reopened.activate(item.id);
+  assert.equal(preflights,1);assert.equal(coreValidations,3);
+  assert.deepEqual(await readFile(f.manifest),before);
+});
+
+test('opt-in application validation failures preserve selected metadata and running configuration', async t=>{
+  const f=await metadataFixture(t,{}),a=await f.store.addLocal({name:'A',content:'valid: a\n'}),b=await f.store.addLocal({name:'B',content:'valid: b\n'});
+  await f.store.activate(a.id);
+  const before=await readFile(f.manifest);
+  let coreValidations=0,rejectCandidate=true,running='valid: a\n';
+  const reopened=createProfileStore({directory:f.directory,applyConfigValidates:true,
+    validateConfig:async()=>{assert.fail('the opted-in apply owns validation');},
+    applyConfig:async target=>{coreValidations++;const candidate=await readFile(target,'utf8');if(rejectCandidate)throw Error('private core validation details');running=candidate;}
+  });
+  await assert.rejects(reopened.restoreActive(),error=>error.status===503 && !error.message.includes('private'));
+  await assert.rejects(reopened.activate(a.id),error=>error.status===422 && !error.message.includes('private'));
+  await assert.rejects(reopened.activate(b.id),error=>error.status===422 && !error.message.includes('private'));
+  assert.equal(coreValidations,3);assert.equal(running,'valid: a\n');
+  assert.equal((await reopened.list()).activeId,a.id);assert.deepEqual(await readFile(f.manifest),before);
+  rejectCandidate=false;await reopened.activate(b.id);
+  assert.equal(coreValidations,4);assert.equal(running,'valid: b\n');assert.equal((await reopened.list()).activeId,b.id);
+});
+
 test('manifest retry preserves an external replacement and restores the previous running profile', {skip:process.platform!=='win32'}, async t=>{
   let armed=false,attempts=0,foreign;
   const f=await metadataFixture(t,{renameMetadata:async(from,to)=>{if(armed){attempts++;const next=JSON.parse(await readFile(to,'utf8'));next.foreign='keep';foreign=Buffer.from(JSON.stringify(next));await writeFile(to,foreign);throw Object.assign(Error('sharing'),{code:'EPERM'});}return rename(from,to);}});

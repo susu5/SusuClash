@@ -9,6 +9,7 @@ import { diagnose, systemProxyEnabled } from './diagnostics.mjs';
 import { createManagedCore } from './managed-core.mjs';
 import { createProfileStore, ProfileError } from './profiles.mjs';
 import { createSystemProxy, ProxyError } from './system-proxy.mjs';
+import { createProxyPreferences, ProxyPreferenceError } from './proxy-preferences.mjs';
 import { createAutomation } from './automation.mjs';
 import { createHealthProbe, targets as healthTargets } from './health-probe.mjs';
 import { createAutostart } from './autostart.mjs';
@@ -28,6 +29,7 @@ const assets = {
   'design-system.css': ['design-system.css', 'text/css; charset=utf-8'],
   'visual-contract.css': ['visual-contract.css', 'text/css; charset=utf-8'],
   'visual-contract.js': ['visual-contract.js', 'application/javascript; charset=utf-8'],
+  'backups.css': ['backups.css', 'text/css; charset=utf-8'],
   'doctor.js':['doctor.js','application/javascript; charset=utf-8'],
   'doctor.css':['doctor.css','text/css; charset=utf-8'],
   'netfix.js':['netfix.js','application/javascript; charset=utf-8'],
@@ -135,10 +137,11 @@ async function httpProviders(core) {
   return Object.entries(response?.providers ?? {}).filter(([, data]) => data?.vehicleType === 'HTTP').map(([name]) => name);
 }
 
-export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, monitor, healthProbe, codexHealth, netfixService, netfixOptions = {}, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, dailyUpdate, automationIntervalMs = 5000, connectionDoctor, doctorSystem, restartClient, codexTargetAdapter, connectionIdentity = createConnectionIdentity() } = {}) {
+export async function startServer({ core = createManagedCore(), diagnostic = diagnose, readSystemProxy = systemProxyEnabled, profileStore, systemProxy, proxyPreferences, monitor, healthProbe, codexHealth, netfixService, netfixOptions = {}, autostart, trayPreferences, themePreferences, updateChecker, updateRequest, dailyUpdate, automationIntervalMs = 5000, connectionDoctor, doctorSystem, restartClient, codexTargetAdapter, connectionIdentity = createConnectionIdentity() } = {}) {
   const managed = typeof core.applyConfig === 'function';
-  const profiles = profileStore || (managed ? createProfileStore({ directory: path.join(core.directory, 'profiles'), validateConfig: core.validateConfig, applyConfig: core.applyConfig }) : null);
+  const profiles = profileStore || (managed ? createProfileStore({ directory: path.join(core.directory, 'profiles'), validateConfig: core.validateConfig, applyConfig: core.applyConfig, applyConfigValidates: core.validatesConfig === true }) : null);
   const proxy = systemProxy || (managed ? createSystemProxy({ directory: core.directory }) : null);
+  const proxyIntent = proxyPreferences || (managed ? createProxyPreferences({ directory: core.directory }) : null);
   const startup = autostart || (managed ? createAutostart() : null);
   const tray = trayPreferences || (managed ? createTrayPreferences({directory:core.directory}) : null);
   const theme = themePreferences || (managed ? createThemePreferences({directory:core.directory}) : null);
@@ -176,12 +179,51 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
   let restoring = null;
   let recoveryWarning = null;
   let proxyRecoveryFailed = false;
+  let proxyResumeFailed = false;
   if (profiles && managed) {
     restoring = (async () => {
       try { if (proxy) await proxy.restoreOnExit(); }
-      catch { proxyRecoveryFailed = true; recoveryWarning = '上次异常退出后，系统代理恢复失败。请先检查 Windows 代理设置。'; return; }
+      catch { proxyRecoveryFailed = true; recoveryWarning = '上次异常退出后，系统代理恢复失败。请先检查 Windows 代理设置。'; logEvent('error', recoveryWarning); return; }
       try { await profiles.restoreActive(); }
-      catch { recoveryWarning = '无法恢复上次配置，请检查内核和配置。'; }
+      catch { recoveryWarning = '无法恢复上次配置，请检查内核和配置。'; logEvent('error', recoveryWarning); return; }
+      if (!proxy || !proxyIntent) return;
+      let applied = false;
+      try {
+        const intent = await proxyIntent.get();
+        if (intent.valid === false) throw new ProxyPreferenceError('read');
+        if (intent.enabled !== true) return;
+        const version = await core.call('GET', '/version');
+        const config = publicConfig(await core.call('GET', '/configs'));
+        const generation = core.processId?.() ?? null;
+        if (core.status().state !== 'running' || typeof version?.version !== 'string' || !version.version || !config.port || await localPortOpen(config.port) !== 'ok') throw new AppError('启动入口尚未确认。', 503);
+        if (typeof core.processId === 'function' && !Number.isInteger(generation)) throw new AppError('启动内核归属尚未确认。', 503);
+        const sameCore = async () => {
+          if (core.status().state !== 'running' || typeof core.processId === 'function' && core.processId() !== generation) return false;
+          const latest = publicConfig(await core.call('GET', '/configs'));
+          return latest.port === config.port && core.status().state === 'running' && (typeof core.processId !== 'function' || core.processId() === generation);
+        };
+        const current = await proxy.getStatus();
+        if (current.enabled !== false) {
+          proxyResumeFailed = true;
+          recoveryWarning = '系统代理已由其他设置启用或状态未确认，本次保留现状，未自动接管。';
+          logEvent('warn', recoveryWarning);
+          return;
+        }
+        if (!await sameCore()) throw new AppError('启动期间内核已变化。', 503);
+        const confirmed = await proxy.enable(config.port);
+        applied = true;
+        if (!confirmed?.enabled || !confirmed.managed || confirmed.port && confirmed.port !== config.port) throw new AppError('启动代理写回未确认。', 503);
+        if (!await sameCore()) throw new AppError('启动期间内核已变化。', 503);
+        logEvent('info', '已按上次明确选择恢复系统代理并回读确认');
+      } catch (error) {
+        proxyResumeFailed = true;
+        recoveryWarning = error instanceof ProxyPreferenceError ? error.message : '启动时未能确认系统代理已恢复开启，请检查代理状态。';
+        if (applied) {
+          try { await proxy.disable(); }
+          catch { recoveryWarning = '启动时系统代理恢复失败，撤回尚未确认，请检查代理状态。'; }
+        }
+        logEvent('error', recoveryWarning);
+      }
     })().finally(() => { restoring = null; });
   }
 
@@ -301,7 +343,14 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
         if (problem !== 'core') return {ok:false};
         return mutation(async () => {
           if (signal.aborted || !isCurrent()) return {ok:false};
-          try { if((doctor?.isRepairing() || netfix?.isRepairing()))return {ok:false};invalidateChecks('后台正在恢复内核，请重新检查连接。');await core.stop();await core.start(); logEvent('info', '已尝试自动重启内核'); return {ok:true}; }
+          try {
+            if ((doctor?.isRepairing() || netfix?.isRepairing()) || (await profiles.list()).activeId !== observation.scope || core.status().state !== 'error' || signal.aborted || !isCurrent()) return {ok:false};
+            invalidateChecks('后台正在恢复内核，请重新检查连接。');
+            await core.stop();
+            if (signal.aborted || !isCurrent() || (await profiles.list()).activeId !== observation.scope || core.status().state !== 'stopped' || signal.aborted || !isCurrent()) return {ok:false};
+            await core.start();
+            logEvent('info', '已尝试自动重启内核'); return {ok:true};
+          }
           catch { logEvent('error', '自动重启内核失败'); return {ok:false}; }
         }, false);
       },
@@ -466,6 +515,9 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       if (!automation || !profiles) throw new AppError('自动处理不可用。', 503);
       const scope = (await profiles.list()).activeId;
       if (!scope) throw new AppError('请先启用配置。', 409);
+      if (Object.hasOwn(input, 'scope') && (typeof input.scope !== 'string' || !input.scope || input.scope !== scope)) {
+        throw new AppError('配置已切换，请重新打开备用节点后再保存。', 409);
+      }
       if (typeof input.group !== 'string' || !input.group || input.group.length > 200) throw new AppError('请选择策略组。', 400);
       const response = await core.call('GET', '/proxies');
       const group = routingGroups(response, 'rule').find(item => item.name === input.group);
@@ -485,7 +537,9 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
         if (input.autoSwitch && !chosen.some(name => name !== group.current)) throw new AppError('请先选择不同于当前线路的备用节点。', 409);
         accepted.autoSwitch = input.autoSwitch;
       }
+      if ((await profiles.list()).activeId !== scope) throw new AppError('配置已切换，请重新打开备用节点后再保存。', 409);
       await rememberGroup(scope, group.name);
+      if ((await profiles.list()).activeId !== scope) throw new AppError('配置已切换，请重新打开备用节点后再保存。', 409);
       try { await automation.configure(accepted); }
       catch (error) { throw new AppError(error.message || '无法保存自动处理设置。', 400); }
       return automationStatus(monitorGroup);
@@ -500,7 +554,8 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
     'core-stop': () => mutation(async () => {
       if (!managed) throw new AppError('内核控制不可用。', 503);
       if (restoring) await restoring;
-      if (proxy) await proxy.restoreOnExit();
+      if (proxyIntent) await proxyIntent.change(false, async () => { if (proxy) await proxy.restoreOnExit(); });
+      else if (proxy) await proxy.restoreOnExit();
       await core.stop();
       logEvent('info', '内核已停止');
       return core.status();
@@ -510,14 +565,23 @@ export async function startServer({ core = createManagedCore(), diagnostic = dia
       if (restoring) await restoring;
       return tracked(async () => {
         let status;
-        if (!input.enabled) { await proxy.disable(); status = await proxy.getStatus(); }
-        else {
+        const change = async () => {
+          if (!input.enabled) { await proxy.disable(); return proxy.getStatus(); }
           const config = publicConfig(await core.call('GET', '/configs'));
           if (!config.port) throw new AppError('代理端口尚未就绪。', 409);
-          status = await proxy.enable(config.port);
+          return proxy.enable(config.port);
+        };
+        try { status = proxyIntent ? await proxyIntent.change(input.enabled, change) : await change(); }
+        catch (error) {
+          if (error instanceof ProxyPreferenceError && error.code === 'rollback') {
+            proxyResumeFailed = true;
+            recoveryWarning = error.message;
+          }
+          throw error;
         }
-        if (proxyRecoveryFailed && (status.managed || !status.recoveryAvailable)) {
+        if ((proxyRecoveryFailed || proxyResumeFailed) && (status.managed || !status.recoveryAvailable)) {
           proxyRecoveryFailed = false;
+          proxyResumeFailed = false;
           recoveryWarning = null;
         }
         return status;

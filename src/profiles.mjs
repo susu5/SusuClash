@@ -76,9 +76,11 @@ function isNodeLinkList(value) {
  * Isolated profile storage. Validators must test the exact candidate with the
  * chosen core and must reject unsupported content. Application must either
  * load successfully or reject without replacing the previous running config.
+ * Set applyConfigValidates only when applyConfig validates the exact candidate
+ * before changing the running instance; it removes a redundant preflight.
  * The returned profile metadata never exposes subscription URLs or config paths.
  */
-export function createProfileStore({ directory, validateConfig, applyConfig, fetchImpl = globalThis.fetch, timeoutMs = 12000, system = {} } = {}) {
+export function createProfileStore({ directory, validateConfig, applyConfig, applyConfigValidates = false, fetchImpl = globalThis.fetch, timeoutMs = 12000, system = {} } = {}) {
   if (!directory || typeof validateConfig !== 'function' || typeof applyConfig !== 'function') throw new TypeError('directory, validateConfig and applyConfig are required');
   const root = path.resolve(directory);
   const filesDir = path.join(root, 'files');
@@ -126,6 +128,10 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
   async function persist(next) {
     const saved = await writeAtomicMetadata(manifestPath, JSON.stringify(next, null, 2), { expected: manifestFingerprint, renameMetadata: system.renameMetadata, hook: system.hook });
     manifestFingerprint = saved.fingerprint; state = next;
+  }
+  async function applyValidated(target) {
+    if (applyConfigValidates !== true) await validateConfig(target);
+    return applyConfig(target);
   }
   async function candidate(content) {
     const version = randomUUID();
@@ -235,16 +241,18 @@ export function createProfileStore({ directory, validateConfig, applyConfig, fet
       if (!state.activeId) return null;
       const item = find(state.activeId);
       await assertManifestCurrent();
-      try { await validateConfig(file(item.version)); await applyConfig(file(item.version)); }
+      try { await applyValidated(file(item.version)); }
       catch { throw new ProfileError('无法恢复上次配置，请检查内核或配置。', 503); }
       return publicProfile(item);
     }),
     activate: id => exclusive(async () => {
       const item = find(id);
-      if (state.activeId === id) return publicProfile(item);
       await assertManifestCurrent();
-      try { await validateConfig(file(item.version)); await applyConfig(file(item.version)); }
+      try { await applyValidated(file(item.version)); }
       catch { throw new ProfileError('配置启用失败，旧配置文件已保留；请检查运行状态。', 422); }
+      // A selected profile can outlive its core after a failed restore or exit.
+      // Reapply it before reporting success, without rewriting unchanged metadata.
+      if (state.activeId === id) return publicProfile(item);
       const previousId = state.activeId;
       try { await persist({ ...state, activeId: id }); }
       catch (error) {

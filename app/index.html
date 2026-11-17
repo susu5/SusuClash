@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="app.css"><link rel="stylesheet" href="theme-v2.css"><link rel="stylesheet" href="lines-v3.css"><link rel="stylesheet" href="settings-v2.css"><link rel="stylesheet" href="secondary-fix.css"><link rel="stylesheet" href="window-frame.css"><link rel="stylesheet" href="update-check.css"><script src="app.js" defer></script><script src="theme-v2.js" defer></script><script src="lines-v3.js" defer></script><script src="settings-v2.js" defer></script><script src="secondary-fix.js" defer></script><script src="window-frame.js" defer></script><script src="update-check.js" defer></script>
 <link rel="stylesheet" href="doctor.css"><link rel="stylesheet" href="visual-polish.css"><script src="doctor.js" defer></script><link rel="stylesheet" href="design-system.css">
 <link rel="stylesheet" href="visual-contract.css"><script src="visual-contract.js" defer></script>
+<link rel="stylesheet" href="backups.css">
 <link rel="stylesheet" href="netfix.css"><script src="netfix.js" defer></script>
 </head>
 <body data-tone="normal"><svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -215,11 +216,35 @@
         <div><button type="button" class="text-button return-link" id="cancelBackups">‹ 取消</button><h1 id="backupsTitle">备用节点</h1><p id="backupGroupLabel">策略组</p></div>
         <button type="button" class="secondary" id="saveBackups">保存</button>
       </header>
-      <div class="section-label">尝试顺序 <span id="draftCount">已选 0 个</span></div>
-      <div class="glass backup-list" id="backupList" aria-label="备用节点尝试顺序"></div>
-      <p class="hint">按住右侧手柄拖动排序，越靠上越先尝试。</p>
-      <div class="section-label">添加节点 <span>当前线路会自动跳过</span></div>
-      <div class="glass available-list" id="availableNodes" aria-label="可添加的节点"></div>
+      <p class="hint backup-intro">名单和顺序由你保存，自动切换只改变当前线路。</p>
+      <p class="warning-inline" id="backupContextWarning" role="status" hidden></p>
+      <div class="line-filters backup-tabs" role="tablist" aria-label="编辑备用节点">
+        <button type="button" class="line-filter" id="backupTabChoices" role="tab" aria-selected="true" aria-controls="backupSelectionPanel">选择节点</button>
+        <button type="button" class="line-filter" id="backupTabSelected" role="tab" aria-selected="false" aria-controls="backupOrderPanel" tabindex="-1">已选顺序</button>
+      </div>
+      <div id="backupSelectionPanel" class="backup-panel" role="tabpanel" aria-labelledby="backupTabChoices">
+        <div class="backup-search-field">
+          <label for="backupSearch" class="backup-search-label">查找节点</label>
+          <div class="connection-search backup-search">
+            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>
+            <input id="backupSearch" type="search" placeholder="搜索名称或地区" autocomplete="off" aria-describedby="backupSearchSummary">
+          </div>
+        </div>
+        <div class="backup-toolbar">
+          <button type="button" class="secondary" id="backupSelectResults">全选搜索结果</button>
+          <button type="button" class="text-button" id="backupClearSelection">清空已选</button>
+        </div>
+        <p class="hint backup-search-summary" id="backupSearchSummary" role="status">勾选后加入备用，最多64个。</p>
+        <div class="glass available-list" id="availableNodes" aria-label="可选择的备用节点"></div>
+      </div>
+      <div id="backupOrderPanel" class="backup-panel" role="tabpanel" aria-labelledby="backupTabSelected" hidden>
+        <div class="section-label">尝试顺序 <span id="draftCount">已选 0 个</span></div>
+        <div class="backup-toolbar backup-order-toolbar">
+          <p class="hint">越靠上越先尝试，可点击上移或下移。</p>
+          <button type="button" class="text-button" id="backupRemoveStale" hidden>移除失效节点</button>
+        </div>
+        <div class="glass backup-list" id="backupList" aria-label="备用节点尝试顺序"></div>
+      </div>
     </section>
     <section class="view" data-page="check" aria-labelledby="checkTitle" hidden>
       <header class="heading" tabindex="-1"><div><button type="button" class="text-button return-link" data-open="home">‹ 返回首页</button><h1 id="checkTitle">问题检测</h1><p>查看当前问题及处理结果</p></div><button type="button" class="secondary" id="runCheck">重新检测</button></header>

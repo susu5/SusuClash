@@ -125,7 +125,9 @@ export function createAutomation({probe, repair, select, verify, load = async ()
         lastChecked:new Date(now()).toISOString(), problem:failed || null,
         phase:failed ? 'issue' : confirming ? 'confirming' : 'monitoring',
         message:failed ? resultMessage(failed) : confirming ? '发现异常，正在等待下一次检查确认' : '检查完成；未知项目尚未确认'};
-      if (!failed || !observed.scope || !observed.group) return snapshot();
+      // A failed core cannot provide routing groups. Recover its owned process
+      // without requiring a group; selecting or repairing a node still needs one.
+      if (!failed || !observed.scope || (failed !== 'core' && !observed.group)) return snapshot();
       if ((!preferences.autoRepair && !preferences.autoSwitch) || now() - lastActionAt < cooldownMs) return snapshot();
       // A Codex-only failure is target-specific and does not justify a repair or node change.
       if (failed === 'codex') return snapshot();
@@ -143,7 +145,8 @@ export function createAutomation({probe, repair, select, verify, load = async ()
         if (changed(mine)) return snapshot();
         const after = normalise(await bounded(() => probe({signal:task.signal}), task, mine));
         if (changed(mine)) return snapshot();
-        if (fixed?.ok === true && after[failed] === 'ok') {
+        if (fixed?.ok === true && after.scope === observed.scope && after[failed] === 'ok' &&
+            (failed !== 'core' || after.port === 'ok')) {
           resetCounts(); state = {...state, phase:'recovered',problem:null,checks:after,message:'自动修复后复查通过'};
           return snapshot();
         }
