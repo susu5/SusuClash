@@ -25,7 +25,7 @@
 
 安装器源码位于 `packaging/installer/`。常规公开构建入口 `packaging/build_msi_release.py` 会重新编译当前版本的安装器，不会自动复制本版发行包中版本0.1.25.0的组件；因此该入口不承诺精确重现发行包字节。组件可从本版MSI纯解包核对，不能只凭源码相同断言二进制相同。构建输入、许可与边界见 [BUILDING.md](BUILDING.md)、[依赖清单](packaging/release-dependencies-v0.1.26.json) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
-本版 Release 另提供固定宿主构建输入 `SusuClashWindow-x64-v0.1.26.exe`（27,648 字节），SHA-256为 `e46640b1a79f13e7a173d2d5273a9064cec97c799b6e1883233e383a570eaebd`。它与MSI中的 `runtime/webview2/SusuClashWindow.exe` 字节相同；也可从本版MSI纯提取。对应 `src/window-host.cs` 的SHA-256为 `42420164237d2e73b2fce8d19b7eaf9e3e49c077c66fc667b2c5c1dac63a0cf7`。构建时按 BUILDING 改名并放入 `--installer-deps`，不依赖个人机器缓存或未发布版本的目录。
+本版 Release 只提供完整 MSI。构建时从 MSI 纯解包提取 `runtime/webview2/SusuClashWindow.exe`（27,648字节），SHA-256为 `e46640b1a79f13e7a173d2d5273a9064cec97c799b6e1883233e383a570eaebd`。对应 `src/window-host.cs` 的SHA-256为 `42420164237d2e73b2fce8d19b7eaf9e3e49c077c66fc667b2c5c1dac63a0cf7`。按 [BUILDING.md](BUILDING.md) 放入 `--installer-deps`，不依赖个人机器缓存或单独的宿主下载资产。
 
 ## 公开文档与设计合同
 

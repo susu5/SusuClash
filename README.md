@@ -2,6 +2,12 @@
 
 Windows x64 独立代理客户端，管理受控 Mihomo、订阅、线路和活动连接，并提供八项代理基础检查与 Netfix Codex 网络修复工具箱。
 
+## 下载安装
+
+**[下载完整 MSI 安装包 · Windows x64 · v0.1.26 · 约72 MB](https://github.com/susu5/SusuClash/releases/download/v0.1.26/SusuClash-Setup-x64-v0.1.26.msi)**
+
+只需下载这一个 MSI，双击即可安装。安装前从托盘正常退出旧版。本版仍为预发布版，需要 Microsoft Edge WebView2 Runtime。
+
 ## 本版更新
 
 v0.1.26 简化备用节点查找与顺序调整，并包含 v0.1.25 的启动修复。代理诊断、Netfix 规则和已确认的猫、鱼、鲸三主题继续保留。

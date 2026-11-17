@@ -4,7 +4,7 @@ SusuClash 自身源码采用 GNU GPL-3.0-only；以下随 Windows 安装包提�
 
 | 组件或数据 | 来源与版本 | 许可及声明 |
 | --- | --- | --- |
-| Mihomo | [v1.19.33 官方源码和发行版](https://github.com/MetaCubeX/mihomo/tree/v1.19.33) | GPL-3.0；原文见 `licenses/Mihomo-GPL-3.0.txt`。对应版本源码也随本项目的 v0.1.26 预发布提供。 |
+| Mihomo | [v1.19.33 官方源码和发行版](https://github.com/MetaCubeX/mihomo/tree/v1.19.33) | GPL-3.0；原文见 `licenses/Mihomo-GPL-3.0.txt`。完整对应源码保留为 [Mihomo v1.19.33 源码归档](https://github.com/susu5/SusuClash/releases/download/v0.1.24/mihomo-v1.19.33-source.tar.gz)，哈希与本版依赖清单一致。 |
 | Node.js | [v24.22.1 Windows x64 官方发行版](https://nodejs.org/dist/v24.22.1/) | Node.js 及其包含的组件的完整许可和通知见 `licenses/Node-LICENSE.txt`。 |
 | Microsoft WebView2 SDK | [1.0.4078.44 官方 NuGet 包](https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.4078.44) | 许可和通知分别见 `licenses/WebView2-LICENSE.txt`、`licenses/WebView2-NOTICE.txt`。目标机器需要另行安装 WebView2 Runtime。 |
 | yaml | [2.8.1 npm 包](https://www.npmjs.com/package/yaml/v/2.8.1) | ISC；原文见 `licenses/yaml-ISC.txt`。 |
@@ -17,3 +17,11 @@ SusuClash 自身源码采用 GNU GPL-3.0-only；以下随 Windows 安装包提�
 各发行输入的固定 SHA-256、下载地址和核验方式见 `packaging/release-dependencies-v0.1.26.json`。安装包不会包含个人订阅、配置、日志或浏览器资料。
 
 MetaCubeX GeoSite 的其他上游域名表及转换工具来源见其 README 与构建脚本，包括 V2Fly Domain List Community、Loyalsoldier/domain-list-custom、dnsmasq-china-list、GFWList 等。本版沿用 v0.1.20 的已核验运行依赖和数据，GeoSite、GeoIP、Country 和 ASN 数据及其来源保持不变。
+
+## 对应源码下载
+
+本版运行依赖与固定数据沿用已核验版本；以下源码归档保留在历史发布位置，版本及SHA-256与本版清单一致。安装用户只需下载本版 MSI。
+
+- [Mihomo v1.19.33 完整对应源码](https://github.com/susu5/SusuClash/releases/download/v0.1.24/mihomo-v1.19.33-source.tar.gz)
+- [MetaCubeX GeoSite 固定构建源码](https://github.com/susu5/SusuClash/releases/download/v0.1.24/MetaCubeX-geosite-build-source-4178770.tar.gz)
+- [WiX b8977d6 完整对应源码](https://github.com/susu5/SusuClash/releases/download/v0.1.24/wix-b8977d6-source.tar.gz)；同一源码归档也随 MSI 放入 `licenses/`。

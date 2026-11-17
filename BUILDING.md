@@ -1,6 +1,6 @@
 # 构建 SusuClash v0.1.26
 
-本仓库提供客户端、Netfix、原生窗口和 MSI 安装器源码。运行依赖与安装包通过 Release 单独提供，用户订阅、认证、配置和运行日志不进入源码。
+本仓库提供客户端、Netfix、原生窗口和 MSI 安装器源码。Release 只提供一个完整 MSI；源码留在仓库，运行依赖按固定清单取得，用户订阅、认证、配置和运行日志不进入源码。
 
 v0.1.26 是预发布版，包含备用节点编辑与启动修复，保留已知的安装结果／启动提示误判风险。客户端和MSI产品版本为0.1.26；已发布MSI复用经过核验的既有安装组件，未重新编译，程序集版本仍为0.1.25.0。下文的常规公开构建会重新编译安装器，与发行包采用的组件复用路径不同，不承诺产生同一组件或MSI字节。对应关系和组件哈希见 [SOURCE-MAPPING.md](SOURCE-MAPPING.md)，固定输入见 `packaging/release-dependencies-v0.1.26.json`。
 
@@ -38,27 +38,25 @@ npm run test:design
 | `wixtoolset.dtf.windowsinstaller.7.0.0.nupkg` | 清单指定的官方 NuGet 包，保持原始字节。 |
 | `wixtoolset.dtf.customaction.7.0.0.nupkg` | 清单指定的官方 NuGet 包，保持原始字节。 |
 | `wix-b8977d6-source.tar.gz` | 清单指定的官方固定源码提交；MSI把该对应源码放入 `licenses/`，不执行归档内容。 |
-| `SusuClashWindow.exe` | 使用本版 Release 中公开的宿主输入，或从本版MSI纯解包提取，方法见下文。 |
+| `SusuClashWindow.exe` | 从本版完整 MSI 纯解包提取，方法见下文。 |
 
 `licenses/` 中的全部许可原文必须保留。打包器核对已固定的许可哈希，不接受用其他版本的同名文件替换。
 
 ## 可公开取得的窗口宿主输入
 
-本版更新客户端备用页与启动逻辑，原生窗口宿主源码和固定字节不变。宿主作为v0.1.26 Release的独立构建输入公开，不需要任何未发布版本的本机目录。
+本版更新客户端备用页与启动逻辑，原生窗口宿主源码和固定字节不变。公开发行只保留一个完整 MSI；构建者可以从该 MSI 纯解包取得宿主，不需要单独下载或运行宿主 exe，也不依赖未发布版本的本机目录。
 
-从 [v0.1.26 预发布](https://github.com/susu5/SusuClash/releases/tag/v0.1.26) 下载 `SusuClashWindow-x64-v0.1.26.exe`，核对下面哈希，复制到 `--installer-deps` 目录并改名 `SusuClashWindow.exe`。不要为了准备构建输入运行它。
-
-```text
-e46640b1a79f13e7a173d2d5273a9064cec97c799b6e1883233e383a570eaebd
-```
-
-也可在独立目录用 WiX 的纯解包功能处理本版MSI（不使用 `msiexec /i`）：
+下载 [v0.1.26 完整 MSI](https://github.com/susu5/SusuClash/releases/download/v0.1.26/SusuClash-Setup-x64-v0.1.26.msi)，在独立目录用 WiX 的纯解包功能处理（不使用 `msiexec /i`）：
 
 ```powershell
 wix msi decompile -x C:\susu-build\extracted C:\susu-build\SusuClash-Setup-x64-v0.1.26.msi -o C:\susu-build\extracted.wxs
 ```
 
-在提取出的 `File` 目录按 `extracted.wxs` 的 `File` 记录定位 `runtime/webview2/SusuClashWindow.exe` 对应文件，复制为上述输入并核对哈希。独立 Release 资产提供同一字节，通常无需此替代步骤。
+在提取出的 `File` 目录按 `extracted.wxs` 的 `File` 记录定位 `runtime/webview2/SusuClashWindow.exe` 对应文件，复制到 `--installer-deps` 目录并命名为 `SusuClashWindow.exe`。文件大小为27,648字节，SHA-256必须为：
+
+```text
+e46640b1a79f13e7a173d2d5273a9064cec97c799b6e1883233e383a570eaebd
+```
 
 宿主源码是 `src/window-host.cs`，本版源码SHA-256：
 
